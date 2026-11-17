@@ -263,3 +263,8 @@
   .v7-drawer-foot { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .v7-dot.v7-red, .panel-tv .row.red > i, .v7-tv-foot .bar { animation: none !important; } }
+
+/* V7.2 · mensagens sempre visíveis acima dos modais + erro dentro do formulário */
+.toast { z-index: 400 !important; }
+.modal-backdrop .p6-form-error { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 18px; padding: 12px 14px; border-radius: 12px; background: #fff0f2; border: 1px solid #ffc9d2; color: #b3243b; font-size: 12.5px; font-weight: 650; line-height: 1.45; animation: p6-pop .2s var(--p6-ease); }
+.modal-backdrop .p6-form-error svg { flex: none; margin-top: 1px; }
