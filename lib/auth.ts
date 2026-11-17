@@ -21,7 +21,7 @@ export const tvKey = () => env("ESTEIRA_TV_CHAVE");
 const secret = () => env("ESTEIRA_SEGREDO") || teamPassword();
 export const authEnabled = () => Boolean(secret());
 export const onVercel = () => process.env.VERCEL === "1";
-export const roleFromProfile = (profile: string): "admin" | "editor" | "viewer" => profile === "Administrador" ? "admin" : profile === "Visualizador" ? "viewer" : "editor";
+export const roleFromProfile = (profile: string): "admin" | "editor" | "viewer" => profile === "Administrador" ? "admin" : profile === "Visualizador" || profile === "Painel" ? "viewer" : "editor";
 async function hmac(data: string) {
   const key = await crypto.subtle.importKey("raw", enc.encode(secret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return b64url(await crypto.subtle.sign("HMAC", key, enc.encode(data)));

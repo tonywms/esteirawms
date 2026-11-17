@@ -1,7 +1,7 @@
 // V7.6 · Parâmetros de acesso por perfil (usado no menu, nas telas e no servidor).
 // Fonte única: altere aqui para mudar o que cada perfil vê ou edita.
-export type Profile = "Administrador" | "Gestor" | "Analista" | "Consultor" | "Visualizador";
-export const PROFILES: Profile[] = ["Administrador", "Gestor", "Analista", "Consultor", "Visualizador"];
+export type Profile = "Administrador" | "Gestor" | "Analista" | "Consultor" | "Visualizador" | "Painel";
+export const PROFILES: Profile[] = ["Administrador", "Gestor", "Analista", "Consultor", "Visualizador", "Painel"];
 
 const ALL = ["/", "/esteira", "/clientes", "/projetos", "/atividades", "/integracoes", "/implantacao", "/agenda", "/equipe", "/relatorios", "/configuracoes", "/usuarios"];
 const SEM_ADMIN = ALL.filter(p => p !== "/configuracoes" && p !== "/usuarios"); // Inteligência: somente Relatórios
@@ -13,6 +13,7 @@ export const PAGES: Record<Profile, string[]> = {
   Analista: SEM_ADMIN,
   Visualizador: SEM_ADMIN,
   Consultor: ["/atividades", "/implantacao", "/agenda"],
+  Painel: ["/tv"], // só o painel de TV, sem menu e sem edição
 };
 
 /** O que cada perfil pode gravar: "*" = criar, editar e excluir; "edit" = só editar. */
@@ -22,6 +23,7 @@ const WRITE: Record<Profile, Partial<Record<string, "*" | "edit">>> = {
   Analista: { clients: "*", projects: "*", tasks: "*", appointments: "*", staff: "*" },
   Consultor: { tasks: "*", appointments: "*", projects: "edit" },
   Visualizador: {},
+  Painel: {},
 };
 
 export const asProfile = (v?: string | null): Profile | null => (PROFILES as string[]).includes(String(v)) ? (v as Profile) : null;
@@ -35,5 +37,5 @@ export function canWriteEntity(p: Profile, entity: string, method = "POST") {
 }
 export const canManageUsers = (p: Profile) => p === "Administrador" || p === "Gestor";
 export const canImport = canManageUsers;
-export const canExport = (p: Profile) => p !== "Consultor";
+export const canExport = (p: Profile) => p !== "Consultor" && p !== "Painel";
 export const isReadOnly = (p: Profile) => Object.keys(WRITE[p]).length === 0;
