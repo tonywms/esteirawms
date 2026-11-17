@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Chev
 import type { Project, State } from "@/lib/types";
 import { BALL, PHASES, ballOf, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type Health, type PhaseKey } from "@/lib/flow";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
+import Select from "./Select";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onEdit: (p: Project) => void; onOpen: (p: Project) => void };
 const clientName = (s: State, id: string) => s.clients.find(c => c.id === id)?.name || "Cliente";
@@ -137,7 +138,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         <section className="v7-box">
           <h3><Flag size={15} /> Fase atual: {PHASES[idx].label}</h3>
           <div className="v7-grid2">
-            <label><span>Dono da fase</span><select value={phaseOwner(p)} onChange={e => void setPhaseOwner(e.target.value)} disabled={!!busy}>{[...new Set([phaseOwner(p), ...owners])].map(o => <option key={o}>{o}</option>)}</select></label>
+            <label><span>Dono da fase</span><Select value={phaseOwner(p)} onChange={e => void setPhaseOwner(e.target.value)} disabled={!!busy}>{[...new Set([phaseOwner(p), ...owners])].map(o => <option key={o}>{o}</option>)}</Select></label>
             <label><span>Prazo da fase</span><input type="date" value={p.phases?.[k]?.due || ""} onChange={e => void setPhaseDue(e.target.value)} disabled={!!busy} /></label>
           </div>
           <div className="v7-ball-switch"><span>Bola com</span>{BALL.map(b => <button key={b} className={ballOf(p) === b ? "on" : ""} disabled={!!busy} onClick={() => void save("ball", { ballWith: b }, `Bola passou para ${b}`)}>{b}</button>)}</div>
@@ -151,7 +152,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <h3><Target size={15} /> Próxima ação</h3>
           <input className="v7-input" placeholder="O que precisa acontecer para o projeto andar?" value={next.nextAction} onChange={e => setNext(n => ({ ...n, nextAction: e.target.value }))} />
           <div className="v7-grid2">
-            <label><span>Responsável</span><select value={next.nextActionOwner} onChange={e => setNext(n => ({ ...n, nextActionOwner: e.target.value }))}><option value="">Selecione</option>{owners.map(o => <option key={o}>{o}</option>)}</select></label>
+            <label><span>Responsável</span><Select value={next.nextActionOwner} onChange={e => setNext(n => ({ ...n, nextActionOwner: e.target.value }))}><option value="">Selecione</option>{owners.map(o => <option key={o}>{o}</option>)}</Select></label>
             <label><span>Até quando</span><input type="date" value={next.nextActionDue || ""} onChange={e => setNext(n => ({ ...n, nextActionDue: e.target.value }))} /></label>
           </div>
           <button className="btn primary v7-save" disabled={!!busy || !next.nextAction.trim()} onClick={() => void save("next", { ...next, nextActionDue: next.nextActionDue || null }, `Próxima ação: ${next.nextAction}${next.nextActionOwner ? ` (${next.nextActionOwner})` : ""}`)}>Salvar próxima ação</button>
