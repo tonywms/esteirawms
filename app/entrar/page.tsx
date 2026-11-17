@@ -6,7 +6,7 @@ export default function Entrar() {
   async function go(e: React.FormEvent) {
     e.preventDefault(); if (busy) return; setBusy(true); setErro("");
     const r = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, senha }) });
-    if (r.ok) { const volta = new URLSearchParams(window.location.search).get("volta"); window.location.href = volta && volta.startsWith("/") && !volta.startsWith("//") ? volta : "/"; return; }
+    if (r.ok) { const j = await r.json().catch(() => ({})); const volta = new URLSearchParams(window.location.search).get("volta"); window.location.href = volta && volta.startsWith("/") && !volta.startsWith("//") ? volta : (j.home || "/"); return; }
     const j = await r.json().catch(() => ({})); setErro(j.error || "Falha ao entrar."); setBusy(false);
   }
   return <main className="v7-login">

@@ -2,9 +2,9 @@
 // Perfis: Administrador = tudo, inclusive usuários | Gestor/Analista/Consultor = edita a esteira
 //         Visualizador = só consulta | TV = link secreto, só /tv.
 // Variáveis: ESTEIRA_SEGREDO (assina o cookie), ESTEIRA_TV_CHAVE (link da TV).
-export const COOKIE = "esteira_sessao";
+export const COOKIE = "esteira_sessao_v2"; // v2: sessao carrega o perfil (parametros de acesso)
 export type Role = "admin" | "editor" | "viewer" | "tv";
-export type Session = { r: Role; u?: string; n?: string; e?: string; exp: number };
+export type Session = { r: Role; p?: string; u?: string; n?: string; e?: string; exp: number };
 const enc = new TextEncoder();
 const env = (k: string) => (process.env[k] || "").trim();
 const b64url = (buf: ArrayBuffer | Uint8Array) => {

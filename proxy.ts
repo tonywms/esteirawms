@@ -1,13 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { COOKIE, authEnabled, onVercel, readSession, safeEqual, signSession, tvKey, type Role } from "@/lib/auth";
+import { COOKIE, authEnabled, onVercel, readSession, safeEqual, signSession, tvKey } from "@/lib/auth";
+import { asProfile, canExport, canImport, canSeePath, canWriteEntity, homeFor, type Profile } from "@/lib/permissions";
 
 const PUBLIC = ["/entrar", "/api/auth"];
-function allowed(role: Role, path: string, method: string) {
+const LEGACY: Record<string, Profile> = { admin: "Administrador", editor: "Analista", viewer: "Visualizador" };
+
+function apiAllowed(p: Profile, path: string, method: string): string | null {
   const read = method === "GET" || method === "HEAD";
-  if (role === "tv") return read && (path === "/tv" || path === "/api/state");
-  if (role === "viewer") return read;
-  if (role === "editor") return !(path.startsWith("/api/records/users") && !read) && !path.startsWith("/api/import");
-  return true; // admin
+  if (path.startsWith("/api/export")) return canExport(p) ? null : "Seu perfil não pode exportar a base.";
+  if (path.startsWith("/api/import")) return canImport(p) ? null : "Somente Administradores e Gestores podem importar a base.";
+  if (read) return null;
+  const m = path.match(/^\/api\/records\/([^/]+)/);
+  if (m) return canWriteEntity(p, m[1], method) ? null : p === "Visualizador" ? "Seu perfil (Visualizador) permite apenas consulta." : `Seu perfil (${p}) não tem permissão para esta alteração.`;
+  return null;
 }
 
 export async function proxy(req: NextRequest) {
@@ -26,15 +31,25 @@ export async function proxy(req: NextRequest) {
   }
 
   const s = await readSession(req.cookies.get(COOKIE)?.value);
-  if (s && allowed(s.r, pathname, req.method)) return NextResponse.next();
-  if (s && s.r !== "tv") {
-    if (pathname.startsWith("/api/")) return NextResponse.json({ error: s.r === "viewer" ? "Seu perfil (Visualizador) permite apenas consulta." : "Somente Administradores podem alterar usuários ou importar a base." }, { status: 403 });
-    return NextResponse.redirect(new URL("/", req.url));
+  const isApi = pathname.startsWith("/api/");
+  if (!s) {
+    if (isApi) return NextResponse.json({ error: "Sessao obrigatoria." }, { status: 401 });
+    const login = new URL("/entrar", req.url);
+    if (pathname !== "/") login.searchParams.set("volta", pathname);
+    return NextResponse.redirect(login);
   }
-  if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Sessao obrigatoria." }, { status: 401 });
-  const login = new URL("/entrar", req.url);
-  if (pathname !== "/") login.searchParams.set("volta", pathname);
-  return NextResponse.redirect(login);
+  if (s.r === "tv") {
+    const ok = req.method === "GET" && (pathname === "/tv" || pathname === "/api/state");
+    if (ok) return NextResponse.next();
+    return isApi ? NextResponse.json({ error: "Link da TV: somente leitura." }, { status: 403 }) : NextResponse.redirect(new URL("/tv", req.url));
+  }
+  const profile = asProfile(s.p) || LEGACY[s.r] || "Visualizador";
+  if (isApi) {
+    const deny = apiAllowed(profile, pathname, req.method);
+    return deny ? NextResponse.json({ error: deny }, { status: 403 }) : NextResponse.next();
+  }
+  if (pathname === "/tv" || canSeePath(profile, pathname)) return NextResponse.next();
+  return NextResponse.redirect(new URL(homeFor(profile), req.url));
 }
 
 export const config = {

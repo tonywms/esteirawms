@@ -1,5 +1,6 @@
 import { COOKIE, authEnabled, readSession, roleFromProfile, safeEqual, signSession, teamPassword } from "@/lib/auth";
 import { sbAuth, supabaseConfigured } from "@/lib/supabase-store";
+import { asProfile, homeFor, type Profile } from "@/lib/permissions";
 export const runtime = "nodejs";
 const attempts = new Map<string, { n: number; until: number }>();
 const cookie = (v: string, maxAge: number) => `${COOKIE}=${v}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
@@ -8,7 +9,7 @@ const cookie = (v: string, maxAge: number) => `${COOKIE}=${v}; Path=/; HttpOnly;
 export async function GET(req: Request) {
   const raw = req.headers.get("cookie")?.split(/;\s*/).find(c => c.startsWith(COOKIE + "="))?.slice(COOKIE.length + 1);
   const s = await readSession(raw);
-  return Response.json(s ? { name: s.n || "", email: s.e || "", role: s.r } : { name: "", role: authEnabled() ? null : "local" }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json(s ? { name: s.n || "", email: s.e || "", role: s.r, profile: asProfile(s.p) } : { name: "", role: authEnabled() ? null : "local", profile: null }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: Request) {
@@ -18,13 +19,13 @@ export async function POST(req: Request) {
   if (a && a.until > Date.now()) return Response.json({ error: "Muitas tentativas. Aguarde 1 minuto." }, { status: 429 });
   const body = await req.json().catch(() => ({})) as { email?: string; senha?: string };
   const email = String(body.email || "").trim(), senha = String(body.senha || "");
-  let session: { r: "admin" | "editor" | "viewer"; u?: string; n?: string; e?: string } | null = null;
+  let session: { r: "admin" | "editor" | "viewer"; p?: string; u?: string; n?: string; e?: string } | null = null;
   try {
     if (email && supabaseConfigured()) {
       const u = await sbAuth(email, senha);
-      if (u) session = { r: roleFromProfile(u.role), u: u.id, n: u.name, e: u.email };
+      if (u) session = { r: roleFromProfile(u.role), p: asProfile(u.role) || "Visualizador", u: u.id, n: u.name, e: u.email };
     } else if (!email && teamPassword() && safeEqual(senha, teamPassword())) {
-      session = { r: "admin", n: "Equipe" }; // compatibilidade com a senha unica antiga
+      session = { r: "admin", p: "Administrador", n: "Equipe" }; // compatibilidade com a senha unica antiga
     }
   } catch { return Response.json({ error: "Banco de dados indisponivel. Tente novamente." }, { status: 503 }); }
   if (!session) {
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "E-mail ou senha incorretos, ou usuario inativo." }, { status: 401 });
   }
   attempts.delete(ip);
-  const res = Response.json({ ok: true, name: session.n, role: session.r });
+  const res = Response.json({ ok: true, name: session.n, role: session.r, profile: session.p, home: session.p ? homeFor(session.p as Profile) : "/" });
   res.headers.append("Set-Cookie", cookie(await signSession(session, 14), 14 * 86400));
   return res;
 }

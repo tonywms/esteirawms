@@ -318,3 +318,19 @@
 .p6-confirm-actions button:focus-visible { outline: 2px solid var(--p6-cyan-400); outline-offset: 2px; }
 @media (max-width: 520px) { .p6-confirm { padding: 28px 20px 20px; } .p6-confirm-actions { flex-direction: column-reverse; } }
 @media (prefers-reduced-motion: reduce) { .p6-confirm-icon span, .p6-confirm-icon span::after { animation: none; } }
+
+/* V7.6 · Perfil Visualizador: somente consulta (o servidor também bloqueia qualquer gravação) */
+body[data-perfil="Visualizador"] .ent-dropdown-anchor:has(.v5-quick-trigger),
+body[data-perfil="Visualizador"] .row-actions,
+body[data-perfil="Visualizador"] .v4-primary-action,
+body[data-perfil="Visualizador"] .header-actions .btn.primary,
+body[data-perfil="Visualizador"] .p6-modal-delete,
+body[data-perfil="Visualizador"] .ent-btn-accent,
+body[data-perfil="Visualizador"] .modal-foot .btn.primary,
+body[data-perfil="Visualizador"] .v7-move,
+body[data-perfil="Visualizador"] .v7-save,
+body[data-perfil="Visualizador"] .v7-inline .btn,
+body[data-perfil="Visualizador"] .v7-drawer-foot .btn:first-of-type { display: none !important; }
+body[data-perfil="Visualizador"] .schedule-slot.free { pointer-events: none; }
+body[data-perfil="Visualizador"] .v7-drawer :is(select, input, .v7-ball-switch button),
+body[data-perfil="Visualizador"] .modal-backdrop .modal :is(input, select, textarea) { pointer-events: none; background: var(--p6-surface-2) !important; }
