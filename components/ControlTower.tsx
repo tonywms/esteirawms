@@ -6,6 +6,7 @@ import {Activity,AlertCircle,AlertTriangle,Bell,ArrowDownToLine,ArrowLeft,ArrowR
 import type {Appointment,Client,EntityName,Project,Readiness,Staff,State,Task,WorkspaceUser} from "@/lib/types";
 import EnterpriseDashboard from "./EnterpriseDashboard";
 import FlowBoard from "./FlowBoard"; /* WMS_ESTEIRA_V7 */
+import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog"; /* WMS_ESTEIRA_V7_5 */
 import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOwner,summary,todayISO,weeklySlots,weekStart} from "@/lib/metrics";
 
 type ModalMode={entity:EntityName;id?:string};
@@ -86,7 +87,8 @@ export default function ControlTower(){
  const [taskView,setTaskView]=useState<"table"|"kanban">("table"),[week,setWeek]=useState<Date>(()=>weekStart(new Date()));
  const [dashboardFilters,setDashboardFilters]=useState({period:"0",clientId:"",projectId:"",owner:""});
  const [globalQuery,setGlobalQuery]=useState(""); /* WMS_ESTEIRA_V7_2 */
- const [formError,setFormError]=useState(""); /* WMS_ESTEIRA_V7_1 */
+ const [formError,setFormError]=useState("");
+ const [confirmBox,setConfirmBox]=useState<ConfirmBox|null>(null); /* WMS_ESTEIRA_V7_1 */
  const [me,setMe]=useState<{name:string;role:string|null}>({name:"",role:null});
  useEffect(()=>{fetch("/api/auth",{cache:"no-store"}).then(r=>r.json()).then(setMe).catch(()=>{})},[]);
  const [topMenu,setTopMenu]=useState<"alerts"|"profile"|"quick"|null>(null);
@@ -122,15 +124,22 @@ export default function ControlTower(){
   catch(e){const m=e instanceof Error?e.message:"Falha ao salvar";setFormError(m);notify(`Atenção: ${m}`)}finally{setSaving(false)}
  }
  /* WMS_ESTEIRA_V7_4 */
- async function removeFromModal(){if(!modal?.id||saving)return;
-  const label=modal.entity==="appointments"?`o agendamento de ${String(form.consultant||"")} em ${fmtDate(String(form.date||""))} (${String(form.shift||"")})`:`"${String(form.name||form.title||"registro")}"`;
-  if(!window.confirm(`Excluir ${label}? Esta ação não poderá ser desfeita.`))return;setSaving(true);setFormError("");
-  try{const res=await fetch(`/api/records/${modal.entity}/${modal.id}`,{method:"DELETE"});const json=await res.json();if(!res.ok)throw new Error(json.error||"Falha ao excluir");const wasAppt=modal.entity==="appointments";setModal(null);await refresh();notify(wasAppt?"Agendamento excluído: o turno voltou a ficar disponível":"Registro excluído com sucesso")}
-  catch(e){const m=e instanceof Error?e.message:"Falha ao excluir";setFormError(m);notify(`Atenção: ${m}`)}finally{setSaving(false)}
+ const KIND:Record<string,string>={clients:"cliente",projects:"projeto",tasks:"atividade",appointments:"agendamento",staff:"profissional",users:"usuário"};
+ const apptDetails=(a:{consultant?:unknown;date?:unknown;shift?:unknown;projectId?:unknown;title?:unknown;modality?:unknown})=>{const day=String(a.date||"");const wd=day?new Date(day+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long"}):"";const proj=data.projects.find(p=>p.id===a.projectId);return [{label:"Consultor",value:String(a.consultant||"")},{label:"Data",value:day?`${wd.charAt(0).toUpperCase()+wd.slice(1)}, ${fmtDate(day)}`:""},{label:"Turno",value:String(a.shift||"")},{label:"Cliente",value:proj?proj.name:""},{label:"Objetivo",value:String(a.title||"")},{label:"Modalidade",value:String(a.modality||"")}]};
+ async function deleteRecord(entity:EntityName,id:string){const res=await fetch(`/api/records/${entity}/${id}`,{method:"DELETE"});const json=await res.json();if(!res.ok)throw new Error(json.error||"Falha ao excluir")}
+ function removeFromModal(){if(!modal?.id||saving)return;const entity=modal.entity,id=modal.id,isAppt=entity==="appointments";
+  setConfirmBox({icon:isAppt?"calendar":"trash",title:isAppt?"Excluir este agendamento?":`Excluir ${KIND[entity]||"registro"}?`,
+   message:isAppt?`Você está removendo a alocação de ${String(form.consultant||"consultor")} da agenda. Confira os dados abaixo antes de confirmar.`:`Você está excluindo ${KIND[entity]||"o registro"} "${String(form.name||form.title||"")}".`,
+   details:isAppt?apptDetails(form):[],note:isAppt?(String(form.shift)==="Dia Inteiro"?"Por ser Dia Inteiro, manhã e tarde voltam a ficar disponíveis.":"O turno volta a ficar disponível na agenda."):"",
+   confirmLabel:isAppt?"Sim, excluir agendamento":"Sim, excluir",cancelLabel:isAppt?"Manter agendamento":"Cancelar",
+   onConfirm:async()=>{await deleteRecord(entity,id);setModal(null);await refresh();notify(isAppt?"Agendamento excluído: o turno voltou a ficar disponível":"Registro excluído com sucesso")}})
  }
- async function remove(entity:EntityName,id:string,label:string){if(!window.confirm(`Excluir "${label}"? Esta ação não poderá ser desfeita.`))return;
-  try{const res=await fetch(`/api/records/${entity}/${id}`,{method:"DELETE"});const json=await res.json();if(!res.ok)throw new Error(json.error||"Falha ao excluir");await refresh();notify("Registro excluído com sucesso");if(current==="clientes"&&parts.length>1)navigate("/clientes")}
-  catch(e){notify(`Atenção: ${e instanceof Error?e.message:"Falha ao excluir"}`)}
+ async function remove(entity:EntityName,id:string,label:string){const isAppt=entity==="appointments";const appt=isAppt?data.appointments.find(x=>x.id===id):undefined;
+  setConfirmBox({icon:isAppt?"calendar":"trash",title:isAppt?"Excluir este agendamento?":`Excluir ${KIND[entity]||"registro"}?`,
+   message:isAppt&&appt?`Você está removendo a alocação de ${appt.consultant} da agenda. Confira os dados abaixo antes de confirmar.`:`Você está excluindo "${label}".`,
+   details:appt?apptDetails(appt):[],note:isAppt?"O turno volta a ficar disponível na agenda.":entity==="clients"?"Clientes com projetos vinculados não podem ser excluídos.":"",
+   confirmLabel:isAppt?"Sim, excluir agendamento":"Sim, excluir",cancelLabel:isAppt?"Manter agendamento":"Cancelar",
+   onConfirm:async()=>{await deleteRecord(entity,id);await refresh();notify(isAppt?"Agendamento excluído: o turno voltou a ficar disponível":"Registro excluído com sucesso");if(current==="clientes"&&parts.length>1)navigate("/clientes")}})
  }
  const onClickProject=(project:Project)=>navigate(`/projetos/${project.id}`);
  const navigateClient=(client:Client)=>navigate(`/clientes/${client.id}`);
@@ -330,7 +339,7 @@ export default function ControlTower(){
    <div className="ent-dropdown-anchor"><button aria-label="Alertas de tarefas atrasadas" aria-expanded={topMenu==="alerts"} className="ent-top-icon" onClick={()=>setTopMenu(topMenu==="alerts"?null:"alerts")}><Bell size={19}/>{metrics.overdue>0&&<span>{metrics.overdue}</span>}</button>{topMenu==="alerts"&&<div className="ent-popover ent-alerts-pop"><strong><AlertTriangle size={16}/> Atividades atrasadas</strong>{alertTasks.map(t=><button key={t.id} onClick={()=>{openForm("tasks",t as unknown as Record<string,unknown>);setTopMenu(null)}}><span>{t.title}</span><small>{t.owner||"Sem responsável"} · {fmtDate(t.dueDate)}</small></button>)}{!alertTasks.length&&<p>Nenhuma tarefa vencida.</p>}<button className="ent-popover-all" onClick={()=>{navigate("/atividades");setTopMenu(null)}}>Ver atividades <ArrowRight size={14}/></button></div>}</div>
    <div className="ent-dropdown-anchor ent-profile"><button className="ent-profile-button" aria-label="Menu da conta" aria-expanded={topMenu==="profile"} onClick={()=>setTopMenu(topMenu==="profile"?null:"profile")}><span className="profile-avatar">{me.name?initials(me.name):"WM"}</span><span className="ent-profile-copy"><strong>{me.name||"WMS Expert"}</strong><small>{({admin:"Administrador",editor:"Editor",viewer:"Visualizador",tv:"TV",local:"Workspace local"} as Record<string,string>)[me.role||"local"]||"Workspace local"}</small></span><ChevronDown size={15}/></button>{topMenu==="profile"&&<div className="ent-popover ent-profile-pop"><div className="p6-profile-head"><span className="profile-avatar">{me.name?initials(me.name):"WM"}</span><div><strong>{me.name||"Ambiente local"}</strong><p>{(me as {email?:string}).email||(me.role==="local"||!me.role?"Sem login neste ambiente":"Conta da equipe")}</p>{me.role&&me.role!=="local"&&<em>{({admin:"Administrador",editor:"Editor",viewer:"Visualizador",tv:"TV"} as Record<string,string>)[me.role]||me.role}</em>}</div></div><button onClick={()=>{void refresh();setTopMenu(null)}}><RefreshCw size={15}/> Atualizar dados</button><button onClick={()=>{window.location.href="/api/export";setTopMenu(null)}}><Download size={15}/> Exportar backup JSON</button>{me.role&&me.role!=="local"&&<button className="p6-logout" onClick={async()=>{setTopMenu(null);try{await fetch("/api/auth",{method:"DELETE"})}finally{window.location.href="/entrar"}}}><LogOut size={15}/> Sair da conta</button>}</div>}</div>
    </div>
-  </header><main className="main-inner">{loading?<div className="loader"><RefreshCw className="spin" size={24}/> Carregando painel...</div>:error?<div className="error-box"><AlertCircle size={20}/>{error}<button className="btn outline" onClick={()=>void refresh()}>Tentar novamente</button></div>:content()}<footer className="app-footer"><span>© 2026 WMS Expert · Esteira de Entregas</span><span>Importação: {data.sourceFile||"Cadastro local"} · Ambiente local</span></footer></main></div>
+  </header>{confirmBox&&<ConfirmDialog box={confirmBox} onClose={()=>setConfirmBox(null)}/>}<main className="main-inner">{loading?<div className="loader"><RefreshCw className="spin" size={24}/> Carregando painel...</div>:error?<div className="error-box"><AlertCircle size={20}/>{error}<button className="btn outline" onClick={()=>void refresh()}>Tentar novamente</button></div>:content()}<footer className="app-footer"><span>© 2026 WMS Expert · Esteira de Entregas</span><span>Importação: {data.sourceFile||"Cadastro local"} · Ambiente local</span></footer></main></div>
 
   {sidebar&&<button aria-label="Fechar menu" onClick={()=>setSidebar(false)} className="sidebar-overlay"/>}
   {modal&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null)}}><div className={`modal p6-modal p6-modal-${modal.entity}`} role="dialog" aria-modal="true" aria-labelledby="p6-modal-title"><div className="modal-head"><span className="p6-modal-icon" aria-hidden="true">{(()=>{const I=modalIcons[modal.entity];return <I size={24} strokeWidth={1.9}/>})()}</span><div className="p6-modal-heading"><span className="eyebrow">{modal.id?"EDITAR CADASTRO":"NOVO CADASTRO"}</span><h2 id="p6-modal-title">{modal.id?modalEdit[modal.entity]:modalNew[modal.entity]}</h2><p>{modalHints[modal.entity]}</p></div><button className="close-btn" aria-label="Fechar" onClick={()=>setModal(null)}><X size={18}/></button></div><div className="modal-scroll">{formError&&<div className="p6-form-error" role="alert"><AlertTriangle size={17}/><span>{formError}</span></div>}<div className="form-grid">{renderForm()}</div></div><div className="modal-foot">{modal.id&&<button type="button" className="btn ghost p6-modal-delete" disabled={saving} onClick={()=>void removeFromModal()}><Trash2 size={16}/> Excluir</button>}<button className="btn ghost" disabled={saving} onClick={()=>setModal(null)}>Cancelar</button><button className="btn primary" onClick={()=>void persist()} disabled={saving}>{saving?<RefreshCw className="spin" size={17}/>:<Check size={17}/>} {saving?"Salvando...":modal.id?"Salvar alterações":"Cadastrar"}</button></div></div></div>}
