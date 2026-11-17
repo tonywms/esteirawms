@@ -1,4 +1,5 @@
 import {audit,isEntity,loadState,newid,problem,transact,validate} from "@/lib/storage";
+import {passwordsAvailable,setUserPassword} from "@/lib/user-password";
 import type {EntityName,State} from "@/lib/types";
 export const runtime="nodejs";
 export async function GET(_r:Request,context:{params:Promise<{entity:string}>}){
@@ -9,7 +10,7 @@ export async function GET(_r:Request,context:{params:Promise<{entity:string}>}){
 export async function POST(request:Request,context:{params:Promise<{entity:string}>}){
  const {entity}=await context.params;if(!isEntity(entity))return problem("Cadastro inexistente.",404);
  try{
-  const body=await request.json() as Record<string,unknown>;
+  const body=await request.json() as Record<string,unknown>;const password=entity==="users"&&typeof body.password==="string"?body.password.trim():"";delete body.password;if(password&&password.length<8)return problem("A senha precisa ter pelo menos 8 caracteres.");if(password&&!passwordsAvailable())return problem("Senhas exigem o Supabase configurado.");
   if(!body||typeof body!=="object"||Array.isArray(body))return problem("Dados inválidos.");
   const result=await transact((state:State)=>{
    const value:Record<string,unknown>={...body};delete value.id;delete value.source;delete value.createdAt;delete value.updatedAt;
@@ -22,6 +23,6 @@ export async function POST(request:Request,context:{params:Promise<{entity:strin
    (state[entity] as unknown as Record<string,unknown>[]).push(record);
    audit(state,entity,"criado",String(record.id),String(value.name||value.title||value.consultant||"Registro"));
    return record;
-  });return Response.json(result,{status:201});
+  });if(password)await setUserPassword(String((result as {id:unknown}).id),password);return Response.json(result,{status:201});
  }catch(e){return problem(e instanceof Error?e.message:"Falha ao cadastrar.")}
 }

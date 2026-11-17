@@ -1,10 +1,14 @@
 export type Source = {sheet: string; row: number};
 export type Client = {id:string;name:string;system:string;notes:string;createdAt:string;updatedAt:string;source?:Source};
 export type Readiness = {connectivity:string;collectors:string;testBase:string;keyUser:string};
-export type Project = {id:string;clientId:string;name:string;system:string;wave:string;stage:string;progress:number;status:string;team:string;integrationOwner:string;implementationOwner:string;blocker:string;readiness:Readiness;lastMovement:string|null;initialMilestone:string|null;integrationDelivery:string|null;homologationDate:string|null;goLiveDate:string|null;implementationStart:string|null;notes:string;createdAt:string;updatedAt:string;source?:Source};
+export type TimelineEvent = {id:string;at:string;text:string;kind?:string;author?:string};
+export type PhaseInfo = {owner?:string;start?:string|null;due?:string|null;done?:string|null};
+export type Project = {id:string;clientId:string;name:string;system:string;wave:string;stage:string;progress:number;status:string;team:string;integrationOwner:string;implementationOwner:string;blocker:string;readiness:Readiness;lastMovement:string|null;initialMilestone:string|null;integrationDelivery:string|null;homologationDate:string|null;goLiveDate:string|null;implementationStart:string|null;notes:string;createdAt:string;updatedAt:string;source?:Source;
+ /* V7 · esteira por fases (opcionais: projetos antigos sao derivados automaticamente) */
+ phase?:string;phases?:Record<string,PhaseInfo>;ballWith?:string;nextAction?:string;nextActionOwner?:string;nextActionDue?:string|null;timeline?:TimelineEvent[];archivedAt?:string|null};
 export type Task = {id:string;projectId:string;clientId:string;title:string;owner:string;startDate:string|null;dueDate:string|null;status:string;blocker:string;notes:string;slaOriginal?:string;createdAt:string;updatedAt:string;source?:Source};
 export type Appointment = {id:string;projectId:string;clientId:string;consultant:string;date:string|null;shift:string;modality:string;title:string;status:string;notes:string;message:string;sourceWeek?:string;createdAt:string;updatedAt:string;source?:Source};
-export type WorkspaceUser = {id:string;name:string;email:string;role:string;active:boolean;notes:string;createdAt:string;updatedAt:string};
+export type WorkspaceUser = {id:string;name:string;email:string;role:string;active:boolean;notes:string;createdAt:string;updatedAt:string;hasPassword?:boolean;lastLoginAt?:string|null;password?:string};
 export type Staff = {id:string;name:string;role:string;capacity:number;active:boolean;createdAt:string;updatedAt:string};
 export type Audit = {id:string;at:string;entity:string;operation:string;recordId:string;label:string};
 export type EntityName="clients"|"projects"|"tasks"|"appointments"|"staff"|"users";

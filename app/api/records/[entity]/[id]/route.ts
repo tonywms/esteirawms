@@ -1,11 +1,12 @@
 import {audit,isEntity,problem,transact,validate} from "@/lib/storage";
+import {passwordsAvailable,setUserPassword} from "@/lib/user-password";
 import type {State} from "@/lib/types";
 export const runtime="nodejs";
 type C={params:Promise<{entity:string;id:string}>};
 export async function PATCH(request:Request,context:C){
  const {entity,id}=await context.params;if(!isEntity(entity))return problem("Cadastro inexistente.",404);
  try{
-  const body=await request.json() as Record<string,unknown>;
+  const body=await request.json() as Record<string,unknown>;const password=entity==="users"&&typeof body.password==="string"?body.password.trim():"";delete body.password;delete body.hasPassword;delete body.lastLoginAt;if(password&&password.length<8)return problem("A senha precisa ter pelo menos 8 caracteres.");if(password&&!passwordsAvailable())return problem("Senhas exigem o Supabase configurado.");
   if(!body||typeof body!=="object"||Array.isArray(body))return problem("Dados inválidos.");
   const result=await transact((state:State)=>{
    const row=(state[entity] as unknown as Record<string,unknown>[]).find(x=>x.id===id);
@@ -32,7 +33,7 @@ export async function PATCH(request:Request,context:C){
    Object.assign(row,value,{updatedAt:new Date().toISOString()});
    audit(state,entity,"atualizado",id,String(row.name||row.title||row.consultant||"Registro"));
    return row;
-  });return Response.json(result);
+  });if(password)await setUserPassword(id,password);return Response.json(result);
  }catch(e){return problem(e instanceof Error?e.message:"Falha ao atualizar.")}
 }
 export async function DELETE(_request:Request,context:C){

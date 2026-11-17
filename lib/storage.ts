@@ -2,13 +2,36 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { EntityName, State } from "./types";
+/*
+ V7 · Armazenamento:
+  - Supabase (SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY + ESTEIRA_DB_CHAVE): tabelas reais, usado no Vercel
+    e tambem no seu computador quando o .env.local estiver configurado (mesmos dados nos dois).
+  - Arquivo local data/state.json: modo antigo, quando o Supabase nao esta configurado.
+*/
+import { sbLoad, sbReplace, sbSaveDiff, supabaseConfigured } from "./supabase-store";
 const dbFile=path.join(process.cwd(),"data","state.json");
+export const storageMode=():"supabase"|"file"=>supabaseConfigured()?"supabase":"file";
+const assertWritableHost=()=>{if(process.env.VERCEL==="1"&&storageMode()==="file")throw new Error("Armazenamento nao configurado: defina SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY e ESTEIRA_DB_CHAVE no Vercel.")};
+export const emptyState=():State=>({version:1,importedAt:"",sourceFile:"",clients:[],projects:[],tasks:[],appointments:[],staff:[],users:[],audit:[]});
 let queue=Promise.resolve();
 export const validEntities:EntityName[]=["clients","projects","tasks","appointments","staff","users"];
 export const isEntity=(name:string):name is EntityName=>validEntities.includes(name as EntityName);
-export async function loadState():Promise<State>{const raw=JSON.parse(await fs.readFile(dbFile,"utf8")) as State; if(!Array.isArray(raw.users))raw.users=[]; return raw;}
+const normalize=(raw:State)=>{for(const k of validEntities)if(!Array.isArray(raw[k]))(raw as unknown as Record<string,unknown[]>)[k]=[];if(!Array.isArray(raw.audit))raw.audit=[];return raw};
+
+export async function loadState():Promise<State>{
+ assertWritableHost();
+ if(storageMode()==="supabase")return normalize(await sbLoad());
+ return normalize(JSON.parse(await fs.readFile(dbFile,"utf8")) as State);
+}
 export async function transact<T>(fn:(state:State)=>T|Promise<T>):Promise<T>{
  const work=queue.then(async()=>{
+  if(storageMode()==="supabase"){
+   const state=await loadState();
+   const before=structuredClone(state);
+   const out=await fn(state);
+   await sbSaveDiff(before,state);
+   return out;
+  }
   const state=await loadState();
   const out=await fn(state);
   const tmp=path.join(path.dirname(dbFile),`.state-${randomUUID()}.tmp`);
@@ -18,6 +41,16 @@ export async function transact<T>(fn:(state:State)=>T|Promise<T>):Promise<T>{
  });
  queue=work.then(()=>undefined,()=>undefined);
  return work;
+}
+/** Substitui a base inteira (importacao de backup). Valida a estrutura antes. */
+export async function replaceState(next:State){
+ normalize(next);
+ const ids=new Set(next.clients.map(c=>c.id)),pids=new Set(next.projects.map(p=>p.id));
+ if(!next.projects.every(p=>ids.has(p.clientId)))throw new Error("Backup inconsistente: projeto sem cliente.");
+ if(!next.tasks.every(t=>pids.has(t.projectId))||!next.appointments.every(a=>pids.has(a.projectId)))throw new Error("Backup inconsistente: atividade/agendamento sem projeto.");
+ audit(next,"base","importada","*",`Backup importado (${next.clients.length} clientes, ${next.projects.length} projetos)`);
+ if(storageMode()==="supabase"){await sbReplace(next);return {clients:next.clients.length,projects:next.projects.length,tasks:next.tasks.length}}
+ return transact(state=>{Object.assign(state,next);return {clients:next.clients.length,projects:next.projects.length,tasks:next.tasks.length}});
 }
 export const problem=(message:string,status=400)=>Response.json({error:message},{status});
 const required=(value:unknown)=>typeof value==="string"&&value.trim().length>0;
