@@ -278,3 +278,8 @@
 .shell.ent-shell .ent-profile-pop .p6-logout { margin-top: 6px; border-top: 1px solid var(--p6-line) !important; color: #c8344d !important; font-weight: 700; }
 .shell.ent-shell .ent-profile-pop .p6-logout:hover { background: #fff0f2 !important; }
 .shell.ent-shell .ent-profile-pop .p6-logout svg { color: #c8344d !important; }
+
+/* V7.4 · botão Excluir no modal (fica à esquerda, em vermelho) */
+.modal-backdrop .p6-modal .modal-foot .btn.p6-modal-delete { margin-right: auto; color: #c8344d; border-color: #ffd0d8; background: #fff; }
+.modal-backdrop .p6-modal .modal-foot .btn.p6-modal-delete:hover { background: #fff0f2; border-color: #f7a8b6; color: #b3243b; }
+@media (max-width: 640px) { .modal-backdrop .p6-modal .modal-foot { flex-wrap: wrap; } .modal-backdrop .p6-modal .modal-foot .btn.p6-modal-delete { flex: 1 1 100%; margin-right: 0; } }
