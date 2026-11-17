@@ -1,0 +1,53 @@
+/* ESTEIRA DE ENTREGAS V5 — Correções globais de layout e gestão de cadastros */
+.ent-shell .v4-topbar.v4-topbar-dashboard {display:grid;grid-template-columns:148px minmax(380px,1fr) minmax(440px,510px);column-gap:14px;align-items:center;justify-items:stretch;min-height:76px;height:76px;}
+.ent-shell .v4-topbar.v4-topbar-inner {display:grid;grid-template-columns:minmax(0,1fr) minmax(445px,530px);column-gap:14px;align-items:center;min-height:76px;height:76px;}
+.ent-shell .v4-topbar .ent-headerfilters {min-width:0;width:100%;grid-template-columns:repeat(4,minmax(0,1fr));align-self:center;}
+.ent-shell .v4-topbar .ent-top-right {width:100%;max-width:none;min-width:0;display:grid;grid-template-columns:auto minmax(135px,1fr) 38px minmax(143px,175px);gap:8px;align-items:center;justify-content:end;justify-self:end;margin:0;}
+.ent-shell .v4-topbar .ent-global-search {width:100%;min-width:0;max-width:none;flex:auto;grid-column:2;grid-row:1;}
+.ent-shell .v4-topbar .ent-global-search input {width:100%;text-overflow:ellipsis;}
+.ent-shell .v4-topbar .ent-profile {grid-column:4;grid-row:1;width:100%;min-width:0;max-width:none;padding:0 0 0 11px;margin:0;}
+.ent-shell .v4-topbar .ent-profile-button {width:100%;justify-content:space-between;}
+.ent-shell .v4-topbar .ent-top-right>.ent-dropdown-anchor:not(.ent-profile):not(.v5-quick-anchor) {grid-column:3;grid-row:1;justify-self:center;}
+.ent-shell .v4-topbar .v5-quick-anchor {grid-column:1;grid-row:1;justify-self:start;}
+.v5-quick-trigger {height:37px;padding:0 13px;border:1px solid #286376;border-radius:8px;background:#0a536e;color:#effcff;display:flex;align-items:center;gap:7px;white-space:nowrap;font-weight:760;font-size:11px;cursor:pointer;}
+.v5-quick-trigger:hover,.v5-quick-trigger[aria-expanded=true] {background:#087b91;border-color:#28d6df;}
+.v5-create-popover {width:235px;right:auto;left:0;top:calc(100% + 10px);}
+.ent-shell .v5-create-popover>button:not(.ent-popover-all) {display:flex;align-items:center;flex-direction:row;gap:12px;padding:11px 12px;border-radius:8px;border-top:1px solid #edf2f6;cursor:pointer;}
+.ent-shell .v5-create-popover>button span {font-size:12px;font-weight:700;}
+.ent-shell .v5-create-popover>button svg {color:#0e839c;flex:none;}
+.v5-users-panel {padding:0;overflow:hidden;}
+.v5-users-panel .toolbar {margin:0;border:0;border-bottom:1px solid #e4edf3;}
+.v5-users-explain {display:flex;align-items:center;gap:12px;margin:17px 20px;background:#e8f7fa;border:1px solid #c6e6eb;color:#2f6779;padding:13px 16px;border-radius:10px;font-size:12px;line-height:1.5;}
+.v5-users-explain svg {flex:none;color:#0796ae;}
+.v5-user-name {display:flex;align-items:center;gap:9px;}
+.v5-user-warning {font-size:11px;color:#946a30;background:#fff4e2;border:1px solid #f1d9ad;padding:12px;border-radius:9px;}
+.ent-shell .v5-users-panel .empty {padding:40px;}
+@media (max-width:1550px) {
+ .ent-shell .v4-topbar.v4-topbar-dashboard {grid-template-columns:minmax(135px,1fr) minmax(430px,540px);grid-template-areas:'title right' 'filters filters';row-gap:4px;min-height:118px;height:118px;padding:8px 16px;}
+ .ent-shell .v4-topbar.v4-topbar-dashboard .topbar-start {grid-area:title;}
+ .ent-shell .v4-topbar.v4-topbar-dashboard .ent-headerfilters {grid-area:filters;}
+ .ent-shell .v4-topbar.v4-topbar-dashboard .ent-top-right {grid-area:right;max-width:none;width:100%;}
+}
+@media (max-width:950px) {
+ .ent-shell .v4-topbar.v4-topbar-dashboard {min-height:112px;height:112px;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);}
+ .ent-shell .v4-topbar.v4-topbar-inner {grid-template-columns:minmax(0,1fr) minmax(245px,1.5fr);height:64px;min-height:64px;}
+ .ent-shell .v4-topbar .ent-top-right {grid-template-columns:auto minmax(110px,1fr) 32px 40px;gap:5px;}
+ .ent-shell .v4-topbar .ent-profile {min-width:0;padding-left:5px;}
+ .ent-shell .v4-topbar .ent-profile-copy,.ent-shell .v4-topbar .ent-profile-button>svg {display:none;}
+ .ent-shell .v4-topbar .ent-profile-button {width:35px;}
+ .ent-shell .v4-topbar .ent-filter-label {display:none;}
+ .ent-shell .v4-topbar .ent-filter-trigger {height:34px;}
+ .v5-quick-trigger {padding:0 9px;font-size:0;}
+ .v5-quick-trigger>svg {width:16px;}
+ .v5-quick-trigger>svg:last-child {display:none;}
+}
+@media (max-width:640px) {
+ .ent-shell .v4-topbar.v4-topbar-dashboard,.ent-shell .v4-topbar.v4-topbar-inner {grid-template-columns:1fr auto;grid-template-areas:none;height:64px;min-height:64px;padding:0 11px;}
+ .ent-shell .v4-topbar .ent-headerfilters {display:none;}
+ .ent-shell .v4-topbar .ent-top-right {grid-area:auto;grid-template-columns:34px minmax(110px,1fr) 30px 38px;gap:4px;}
+ .ent-shell .v4-topbar .ent-topbar-name {display:none;}
+ .ent-shell .v4-topbar .ent-global-search {width:100%;}
+ .ent-shell .v4-topbar .profile-avatar {width:31px;height:31px;}
+ .ent-shell .v4-topbar .ent-top-icon {width:30px;height:32px;}
+ .v5-users-explain {margin:12px;font-size:11px;}
+}

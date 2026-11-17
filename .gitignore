@@ -1,0 +1,25 @@
+# Dependencies and build
+node_modules/
+.next/
+.next-*/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# Data and backups (never commit client records)
+data/*
+!data/.gitkeep
+backups/
+*.bak
+*.log
+*.zip
+
+# Source files and imported spreadsheets
+*.xlsx
+*.xls
+*source-workbook*
+.DS_Store
