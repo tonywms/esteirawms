@@ -4,11 +4,11 @@
 import type { State, TimelineEvent } from "./types";
 
 type Row = Record<string, unknown>;
-type Kind = "text" | "textnull" | "int" | "bool" | "date" | "ts" | "json";
+type Kind = "text" | "textnull" | "int" | "bool" | "boolf" | "date" | "ts" | "json";
 const T = (spec: Record<string, Kind>) => spec;
 const TABLES = {
   clients: T({ id: "text", name: "text", system: "text", notes: "text", source: "json", created_at: "ts", updated_at: "ts" }),
-  staff: T({ id: "text", name: "text", role: "text", capacity: "int", active: "bool", created_at: "ts", updated_at: "ts" }),
+  staff: T({ id: "text", name: "text", role: "text", capacity: "int", active: "bool", email: "textnull", sector: "textnull", escalation: "boolf", created_at: "ts", updated_at: "ts" }),
   workspace_users: T({ id: "text", name: "text", email: "text", role: "text", active: "bool", notes: "text", created_at: "ts", updated_at: "ts" }),
   projects: T({
     id: "text", client_id: "text", name: "text", system: "text", wave: "text", stage: "text", progress: "int", status: "text", team: "text",
@@ -43,6 +43,7 @@ function toRow(table: Table, obj: Row): Row {
       case "textnull": out[col] = v == null || v === "" ? null : String(v); break;
       case "int": out[col] = col === "progress" ? PROGRESS_SAFE(v) : Math.max(0, Math.round(Number(v) || 0)); break;
       case "bool": out[col] = v === undefined ? true : Boolean(v); break;
+      case "boolf": out[col] = v === true || v === "true"; break;
       case "date": out[col] = typeof v === "string" && ISO_DAY.test(v) ? v.slice(0, 10) : null; break;
       case "ts": out[col] = typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : col === "archived_at" ? null : new Date().toISOString(); break;
       case "json": out[col] = v == null ? (col === "source" ? null : {}) : v; break;

@@ -67,6 +67,9 @@ export function validate(entity:EntityName, value:Record<string,unknown>,s:State
   if(value.progress!==undefined&&(!Number.isFinite(Number(value.progress))||Number(value.progress)<0||Number(value.progress)>100))return "O avanço deve ficar entre 0 e 100%.";
   // V8: avanço de fase só com o PDF da fase atual anexado
   const old=id?s.projects.find(x=>x.id===id):undefined;
+  // V9: dispensa de PDF só pela rota de liberação master (e-mail + senha)
+  const waivers=(ph:unknown)=>JSON.stringify(Object.entries((ph||{}) as Record<string,{docWaived?:unknown}>).map(([k,v])=>[k,v?.docWaived||null]).filter(x=>x[1]).sort());
+  if(value.phases!==undefined&&waivers(value.phases)!==waivers(old?.phases))return "Somente um usuário master pode liberar fase sem PDF.";
   if(old&&value.phase&&value.phase!==phaseOf(old)){const r=canMove({...old,phases:(value.phases as typeof old.phases)||old.phases},value.phase as PhaseKey);if(!r.ok)return r.reason||"Avanço de fase bloqueado.";}
  }
  if(entity==="tasks"){
@@ -89,6 +92,7 @@ export function validate(entity:EntityName, value:Record<string,unknown>,s:State
  }
  if(entity==="staff"){
   if(!required(value.name))return "Informe o nome do profissional.";
+  if(value.email&&String(value.email).trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value.email).trim()))return "Informe um e-mail válido para o profissional.";
   if(existing.some(x=>x.id!==id&&(x as unknown as {name:string}).name.toLowerCase()===String(value.name).trim().toLowerCase()))return "Este profissional já está cadastrado.";
   if(value.capacity!==undefined&&(!Number.isFinite(Number(value.capacity))||Number(value.capacity)<0))return "A capacidade não pode ser negativa.";
  }

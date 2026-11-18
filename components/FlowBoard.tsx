@@ -3,11 +3,13 @@
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, Hand, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, Send, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, Hand, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
 import { BALL, PHASES, ballOf, canMove, docOf, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
 import type { PhaseDoc } from "@/lib/types";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
+import MasterDialog, { type MasterBox } from "./MasterDialog";
+import EscalateDialog from "./EscalateDialog";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
 import Select from "./Select";
 
@@ -23,9 +25,9 @@ async function patchProject(id: string, body: Record<string, unknown>) {
   return j as Project;
 }
 
-const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", sent: "enviado ao cliente — aguardando assinatura", skipped: "fase não utilizada", future: "fase futura" };
+const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", waived: "liberado sem PDF (master)", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", sent: "enviado ao cliente — aguardando assinatura", skipped: "fase não utilizada", future: "fase futura" };
 function DocIcon({ s, size = 13 }: { s: DocState; size?: number }) {
-  return s === "ok" ? <FileCheck2 size={size} /> : s === "sent" ? <FileClock size={size} /> : s === "skipped" ? <FileMinus2 size={size} /> : s === "future" ? <FileText size={size} /> : <FileX2 size={size} />;
+  return s === "ok" ? <FileCheck2 size={size} /> : s === "waived" ? <ShieldCheck size={size} /> : s === "sent" ? <FileClock size={size} /> : s === "skipped" ? <FileMinus2 size={size} /> : s === "future" ? <FileText size={size} /> : <FileX2 size={size} />;
 }
 const fmtSize = (n?: number) => !n ? "" : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -110,9 +112,10 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   const [next, setNext] = useState({ nextAction: p.nextAction || "", nextActionOwner: p.nextActionOwner || "", nextActionDue: p.nextActionDue || "" });
   const [blocker, setBlocker] = useState(p.blocker && p.blocker !== "-" ? p.blocker : "");
   const [note, setNote] = useState(""), [busy, setBusy] = useState(""), [msg, setMsg] = useState(""), [msgErr, setMsgErr] = useState(false);
-  const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState("");
+  const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState(""), [meEmail, setMeEmail] = useState("");
+  const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => setMeName(j.name || "")).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => { setMeName(j.name || ""); setMeEmail(j.email || ""); }).catch(() => {}); }, []);
   const docs = docStates(p);
   const flash = (text: string, err = false) => { setMsg(text); setMsgErr(err); if (!err) window.setTimeout(() => setMsg(""), 2600); };
   const pickFile = (k2: PhaseKey) => { setDocPhase(k2); fileRef.current?.click(); };
@@ -157,6 +160,8 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         await onRefresh(); flash("Documento removido");
       } });
   }
+  const client = clientName(data, p.clientId);
+  const openMaster = (action: MasterBox["action"], phase?: PhaseKey) => setMasterBox({ action, projectId: p.id, client, current: PHASES[idx].short, phase, phaseLabel: phase ? PHASES.find(x => x.key === phase)?.doc : undefined, options: nextOptions.map(k2 => ({ key: k2, label: PHASES[phaseIndex(k2)].short })), defaultEmail: meEmail });
   async function toggleSent(k2: PhaseKey) {
     const meta = PHASES.find(x => x.key === k2)!, on = !p.phases?.[k2]?.docSentAt, cur = k2 === k;
     const text = on ? `${meta.doc} enviado ao cliente para assinatura` : `${meta.doc}: envio ao cliente desmarcado`;
@@ -215,23 +220,40 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
             {nextOptions.map(to => { const g = canMove(p, to); const skip = k === "homolog" && to === "golive";
               return <button key={to} className={`btn ${skip ? "outline v7-skip" : "primary"}`} disabled={!g.ok || !!busy} title={g.reason} onClick={() => void move(to)}>{busy === "move" ? <RefreshCw className="spin" size={15} /> : skip ? <SkipForward size={15} /> : null}{skip ? "Pular para Go-live" : `Avançar para ${PHASES[phaseIndex(to)].short}`}{!skip && <ArrowRight size={15} />}</button>; })}
           </div>
-          {nextOptions.length > 0 && !canMove(p, nextOptions[0]).ok && <div className="v7-gate"><FileX2 size={18} /><span>{canMove(p, nextOptions[0]).reason}</span>{PHASES[idx].doc && <button type="button" onClick={() => pickFile(k)} disabled={!!busy}><Upload size={14} /> Anexar agora</button>}</div>}
+          {nextOptions.length > 0 && !canMove(p, nextOptions[0]).ok && <div className="v7-gate"><FileX2 size={18} /><span>{canMove(p, nextOptions[0]).reason}</span>{PHASES[idx].doc && <button type="button" onClick={() => pickFile(k)} disabled={!!busy}><Upload size={14} /> Anexar agora</button>}<button type="button" className="v9-master-btn" onClick={() => openMaster("advance")} disabled={!!busy} title="Usuário master libera o avanço sem o PDF"><ShieldCheck size={14} /> Liberar (master)</button></div>}
         </section>
 
         <section className="v7-box v7-docs-box">
-          <h3><Paperclip size={15} /> Documentos da esteira <em>{docs.filter(d => d.state === "ok").length}/{docs.filter(d => d.state !== "skipped").length}</em></h3>
+          <h3><Paperclip size={15} /> Documentos da esteira <em>{docs.filter(d => d.state === "ok" || d.state === "waived").length}/{docs.filter(d => d.state !== "skipped").length}</em></h3>
           {docs.map(d => { const doc = docOf(p, d.key); return <div key={d.key} className={`v7-doc-row s-${d.state}`}>
             <span className="v7-doc-ico"><DocIcon s={d.state} size={18} /></span>
-            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : DOC_STATE_LABEL[d.state]}{!doc && d.state === "sent" && p.phases?.[d.key]?.docSentAt ? ` desde ${fmtDate(p.phases[d.key]!.docSentAt)}` : ""}</small></div>
+            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : (d.state === "waived" && p.phases?.[d.key]?.docWaived ? `liberado sem PDF por ${p.phases[d.key]!.docWaived!.by} em ${new Date(p.phases[d.key]!.docWaived!.at).toLocaleDateString("pt-BR")} · ${p.phases[d.key]!.docWaived!.reason}` : DOC_STATE_LABEL[d.state])}{!doc && d.state === "sent" && p.phases?.[d.key]?.docSentAt ? ` desde ${fmtDate(p.phases[d.key]!.docSentAt)}` : ""}</small></div>
             <div className="v7-doc-act">
               {!doc && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className={`v7-mini-btn sent ${d.state === "sent" ? "on" : ""}`} disabled={!!busy} onClick={() => void toggleSent(d.key)} title={d.state === "sent" ? "Desmarcar envio" : "Marcar que o documento foi enviado ao cliente para assinatura"}><Send size={14} /> {d.state === "sent" ? "Enviado" : "Enviado ao cliente"}</button>}
               {doc && <button type="button" className="v7-mini-btn" onClick={() => void viewDoc(d.key, doc)}><Eye size={14} /> Ver</button>}
+              {!doc && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className="v7-mini-btn master" disabled={!!busy} onClick={() => openMaster("waive", d.key)} title="Dispensar este PDF (usuário master)" aria-label="Dispensar PDF (master)"><ShieldCheck size={14} /></button>}
               <button type="button" className={`v7-mini-btn ${doc ? "" : "primary"}`} disabled={!!busy} onClick={() => pickFile(d.key)}><Upload size={14} /> {doc ? "Substituir" : "Anexar PDF"}</button>
               {doc && <button type="button" className="v7-mini-btn danger" disabled={!!busy} onClick={() => removeDoc(d.key, doc)} aria-label="Remover documento"><X size={14} /></button>}
             </div>
           </div>; })}
           {busy === "doc" && <div className="v7-upload"><span>Enviando {PHASES.find(x => x.key === docPhase)?.doc.toLowerCase()}… {pct}%</span><i><b style={{ width: `${pct}%` }} /></i></div>}
           <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
+        </section>
+
+        <section className="v7-box v9-esc-box">
+          <h3><Megaphone size={15} /> Escalonar entrave</h3>
+          <p>Gere o histórico do projeto em PDF com a marca WMS Expert e envie ao Comercial, à Diretoria ou a quem precisar intervir. O envio fica registrado na linha do tempo.</p>
+          <button type="button" className="btn primary" onClick={() => setEscalate(true)} disabled={!!busy}><Megaphone size={15} /> Escalonar com histórico em PDF</button>
+        </section>
+
+        <section className="v7-box v9-master-box">
+          <h3><ShieldCheck size={15} /> Liberação master</h3>
+          <p>Para casos em que as etapas já aconteceram e o PDF não existe. Exige e-mail e senha de um usuário master e fica registrado.</p>
+          <div className="v9-master-actions">
+            {nextOptions.length > 0 && <button type="button" className="v7-mini-btn master" disabled={!!busy} onClick={() => openMaster("advance")}><ShieldCheck size={14} /> Avançar sem PDF</button>}
+            <button type="button" className="v7-mini-btn" disabled={!!busy || k === "fim"} onClick={() => openMaster("close")}><CheckCircle2 size={14} /> Encerrar projeto</button>
+            <button type="button" className="v7-mini-btn danger" disabled={!!busy} onClick={() => openMaster("cancel")}><Ban size={14} /> Cancelar projeto</button>
+          </div>
         </section>
 
         <section className="v7-box">
@@ -275,5 +297,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
       </footer>
     </aside>
     {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}
+    {masterBox && <MasterDialog box={masterBox} onClose={() => setMasterBox(null)} onDone={async msg => { await onRefresh(); flash(msg); if (masterBox.action === "cancel" || masterBox.action === "close") window.setTimeout(onClose, 900); }} />}
+    {escalate && <EscalateDialog data={data} project={p} client={client} onClose={() => setEscalate(false)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
   </div>, document.body);
 }

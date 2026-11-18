@@ -46,8 +46,8 @@ export default function TvPanel() {
       <div className="k ball"><Hand /><div>{s.ball.map(b => <b key={b.name}><i>{b.count}</i>{b.name}</b>)}</div><span>Bola com · {active} ativos</span></div>
     </section>
 
-    {view === 0 ? <section className="v7-tv-flow" style={{ gridTemplateColumns: `repeat(${PHASES.length}, minmax(0,1fr))` }}>
-      {s.byPhase.map((ph, i) => <div key={ph.key} className={`col ${ph.key === "fim" ? "done" : ""}`}>
+    {view === 0 ? <section className="v7-tv-flow" style={{ gridTemplateColumns: `repeat(${PHASES.length - 1}, minmax(0,1fr))` }}>
+      {s.byPhase.filter(ph => ph.key !== "fim").map((ph, i) => <div key={ph.key} className="col">
         <header><span>{i + 1}</span><strong>{ph.short}</strong><em>{ph.items.length}</em></header>
         <div className="list">{[...ph.items].sort((a, b) => order[a.h.health] - order[b.h.health]).slice(0, 8).map(({ p, h }) =>
           <div key={p.id} className={`c ${h.health}`}><strong>{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d</small>{h.health !== "done" && (docStates(p).some(d => d.state === "pending" || d.state === "missing") ? <em className="pdf" title="Documento pendente"><FileX2 />PDF</em> : docStates(p).some(d => d.state === "sent") ? <em className="pdf sent" title="Aguardando assinatura do cliente"><FileClock />ASSIN.</em> : null)}</div>)}

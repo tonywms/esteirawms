@@ -93,8 +93,9 @@ export function healthOf(p: Project, today = todayISO()): HealthReport {
 export const healthLabel: Record<Health, string> = { green: "No fluxo", amber: "Atenção", red: "Crítico", done: "Encerrado" };
 
 /** Projetos visíveis na operação: encerrados há mais de 30 dias vão para o arquivo. */
+export const isCancelled = (p: Project) => norm(p.status).includes("cancel");
 export function isArchived(p: Project, today = todayISO()) {
-  if (p.archivedAt) return true;
+  if (p.archivedAt || isCancelled(p)) return true;
   if (phaseOf(p) !== "fim") return false;
   const closed = p.phases?.fim?.start || p.goLiveDate || p.lastMovement || isoDay(p.updatedAt);
   return (daysBetween(closed, today) ?? 0) > 30;
@@ -134,9 +135,12 @@ export function movePhasePatch(p: Project, to: PhaseKey, author = "Equipe") {
 
 
 /* ---------- V8 · Documentos obrigatórios por fase ---------- */
-export type DocState = "ok" | "missing" | "pending" | "sent" | "skipped" | "future";
+export type DocState = "ok" | "waived" | "missing" | "pending" | "sent" | "skipped" | "future";
 export const DOC_PHASES = PHASES.filter(p => p.doc) as unknown as { key: PhaseKey; label: string; short: string; doc: string; letter: string; optional: boolean }[];
 export const docOf = (p: Project, k: string) => p.phases?.[k]?.doc || null;
+/** V9 · PDF dispensado por usuário master (registro de quem liberou e por quê). */
+export const waiverOf = (p: Project, k: string) => p.phases?.[k]?.docWaived || null;
+export const docResolved = (p: Project, k: string) => !!docOf(p, k) || !!waiverOf(p, k);
 /** Implantação pulada: o projeto passou dela sem nunca ter entrado. */
 const campoSkipped = (p: Project, cur: PhaseKey) => phaseIndex(cur) > phaseIndex("campo") && !p.phases?.campo?.start && !docOf(p, "campo");
 /** Situação do PDF de cada fase: ok (anexado), pending (fase atual sem PDF), missing (fase já passada sem PDF), skipped, future. */
@@ -147,6 +151,7 @@ export function docStates(p: Project): { key: PhaseKey; letter: string; doc: str
     let state: DocState = docOf(p, ph.key) ? "ok" : i < ci ? "missing" : i === ci ? "pending" : "future";
     if (ph.key === "campo" && state === "missing" && campoSkipped(p, cur)) state = "skipped";
     if ((state === "pending" || state === "missing") && p.phases?.[ph.key]?.docSentAt) state = "sent";
+    if (state !== "ok" && state !== "future" && state !== "skipped" && waiverOf(p, ph.key)) state = "waived";
     return { key: ph.key, letter: ph.letter, doc: ph.doc, label: ph.short, state };
   });
 }
@@ -157,7 +162,7 @@ export function canMove(p: Project, to: PhaseKey): { ok: boolean; reason?: strin
   const skipsOnlyCampo = from === "homolog" && to === "golive";
   if (ti - fi > 1 && !skipsOnlyCampo) return { ok: false, reason: "Avance uma fase por vez." };
   const ph = PHASES[fi];
-  if (ph.doc && !docOf(p, from)) return { ok: false, reason: `Anexe o ${ph.doc.toLowerCase()} (PDF assinado) para sair de ${ph.short}.` };
+  if (ph.doc && !docResolved(p, from)) return { ok: false, reason: `Anexe o ${ph.doc.toLowerCase()} (PDF assinado) para sair de ${ph.short}.` };
   return { ok: true };
 }
 export const docsPending = (p: Project) => docStates(p).filter(d => d.state === "missing" || d.state === "pending" || d.state === "sent");
@@ -167,8 +172,8 @@ export type DocGap = { p: Project; key: PhaseKey; doc: string; label: string; le
 /** Tudo o que a equipe precisa saber para a onda andar: quem pode avançar já, o que falta de PDF e com quem está. */
 export function unlockSummary(s: State, today = todayISO()) {
   const active = s.projects.filter(p => !isArchived(p, today)).filter(p => phaseOf(p) !== "fim" && !isDone(p.status));
-  const ready = active.filter(p => { const k = phaseOf(p); return !!PHASES[phaseIndex(k)].doc && !!docOf(p, k); })
-    .map(p => { const k = phaseOf(p); const to = k === "homolog" ? "campo" : PHASES[phaseIndex(k) + 1].key; return { p, from: k, to: to as PhaseKey, days: daysBetween(p.phases?.[k]?.doc?.uploadedAt, today) ?? 0 }; })
+  const ready = active.filter(p => { const k = phaseOf(p); return !!PHASES[phaseIndex(k)].doc && docResolved(p, k); })
+    .map(p => { const k = phaseOf(p); const to = k === "homolog" ? "campo" : PHASES[phaseIndex(k) + 1].key; return { p, from: k, to: to as PhaseKey, days: daysBetween(p.phases?.[k]?.doc?.uploadedAt || p.phases?.[k]?.docWaived?.at, today) ?? 0 }; })
     .sort((a, b) => b.days - a.days);
   const gaps: DocGap[] = [];
   for (const p of active) for (const d of docStates(p)) {
@@ -184,7 +189,7 @@ export function unlockSummary(s: State, today = todayISO()) {
   const owners = [...ownerMap.values()].sort((a, b) => b.blocks - a.blocks || b.total - a.total);
   const coverage = DOC_PHASES.map(ph => {
     let ok = 0, need = 0, sent = 0;
-    for (const p of s.projects.filter(x => !isArchived(x, today))) { const st = docStates(p).find(d => d.key === ph.key)!.state; if (st === "future" || st === "skipped") continue; need++; if (st === "ok") ok++; if (st === "sent") sent++; }
+    for (const p of s.projects.filter(x => !isArchived(x, today))) { const st = docStates(p).find(d => d.key === ph.key)!.state; if (st === "future" || st === "skipped") continue; need++; if (st === "ok" || st === "waived") ok++; if (st === "sent") sent++; }
     return { key: ph.key, letter: ph.letter, short: ph.short, ok, sent, need, pct: need ? Math.round((ok / need) * 100) : 100 };
   });
   const movedWeek = active.filter(p => { const k = phaseOf(p); const st = p.phases?.[k]?.start; return k !== "kickoff" && !!st && (daysBetween(st, today) ?? 99) <= 6; }).length
