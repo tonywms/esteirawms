@@ -2,7 +2,8 @@ export type Source = {sheet: string; row: number};
 export type Client = {id:string;name:string;system:string;notes:string;createdAt:string;updatedAt:string;source?:Source};
 export type Readiness = {connectivity:string;collectors:string;testBase:string;keyUser:string};
 export type TimelineEvent = {id:string;at:string;text:string;kind?:string;author?:string};
-export type PhaseInfo = {owner?:string;start?:string|null;due?:string|null;done?:string|null};
+export type PhaseDoc = {path:string;name:string;size?:number;uploadedAt:string;uploadedBy?:string}; /* WMS_ESTEIRA_V8 */
+export type PhaseInfo = {owner?:string;start?:string|null;due?:string|null;done?:string|null;doc?:PhaseDoc|null};
 export type Project = {id:string;clientId:string;name:string;system:string;wave:string;stage:string;progress:number;status:string;team:string;integrationOwner:string;implementationOwner:string;blocker:string;readiness:Readiness;lastMovement:string|null;initialMilestone:string|null;integrationDelivery:string|null;homologationDate:string|null;goLiveDate:string|null;implementationStart:string|null;notes:string;createdAt:string;updatedAt:string;source?:Source;
  /* V7 · esteira por fases (opcionais: projetos antigos sao derivados automaticamente) */
  phase?:string;phases?:Record<string,PhaseInfo>;ballWith?:string;nextAction?:string;nextActionOwner?:string;nextActionDue?:string|null;timeline?:TimelineEvent[];archivedAt?:string|null};

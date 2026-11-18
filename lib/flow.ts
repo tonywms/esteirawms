@@ -3,13 +3,15 @@
 import type { Project, State, PhaseInfo } from "./types";
 import { isBlocked, isDone, todayISO } from "./metrics";
 
+// V8 · Ordem oficial: Kickoff/Treinamento > Dev & Integração > Homologação > Implantação (opcional) > Go-live > Encerrado.
+// Cada fase (menos Encerrado) exige o seu PDF assinado para liberar o avanço.
 export const PHASES = [
-  { key: "kickoff", label: "Kickoff", short: "Kickoff", defaultOwner: "Gestão de projetos" },
-  { key: "dev", label: "Desenvolvimento / Integração", short: "Dev & Integração", defaultOwner: "Dev & Integrações" },
-  { key: "campo", label: "Implantação em campo", short: "Implantação", defaultOwner: "Time de Implantação" },
-  { key: "homolog", label: "Homologação", short: "Homologação", defaultOwner: "Cliente" },
-  { key: "golive", label: "Go-live", short: "Go-live", defaultOwner: "Time de Implantação" },
-  { key: "fim", label: "Encerrado", short: "Encerrado", defaultOwner: "" },
+  { key: "kickoff", label: "Kickoff / Treinamento", short: "Kickoff / Treinamento", defaultOwner: "Félix", doc: "Documento de endereçamento", letter: "K", optional: false },
+  { key: "dev", label: "Desenvolvimento / Integração", short: "Dev & Integração", defaultOwner: "Dev & Integrações", doc: "Documento de integração", letter: "D", optional: false },
+  { key: "homolog", label: "Homologação", short: "Homologação", defaultOwner: "Time de Implantação", doc: "Documento de homologação", letter: "H", optional: false },
+  { key: "campo", label: "Implantação", short: "Implantação", defaultOwner: "Time de Implantação", doc: "Documento de implantação", letter: "I", optional: true },
+  { key: "golive", label: "Go-live", short: "Go-live", defaultOwner: "Time de Implantação", doc: "Documento de go-live", letter: "G", optional: false },
+  { key: "fim", label: "Encerrado", short: "Encerrado", defaultOwner: "", doc: "", letter: "", optional: false },
 ] as const;
 export type PhaseKey = (typeof PHASES)[number]["key"];
 export const WAVES = ["Onda 1", "Onda 2", "Onda 3", "Congelado", "Concluído"];
@@ -29,9 +31,9 @@ export function phaseOf(p: Project): PhaseKey {
   const st = norm(p.status), stage = norm(p.stage);
   if (isDone(p.status) || stage.includes("go-live concluido") || stage.includes("golive concluido")) return "fim";
   if (stage.includes("go live") || stage.includes("go-live") || stage.includes("golive") || stage.includes("virada")) return "golive";
+  if (stage.includes("kickoff") || stage.includes("planejamento") || stage.includes("treinamento")) return "kickoff";
   if (stage.includes("homolog") || stage.includes("termo") || st.includes("finaliza")) return "homolog";
-  if (stage.includes("campo") || stage.includes("implanta") || stage.includes("treinamento") || stage.includes("validacao") || st.includes("implanta")) return "campo";
-  if (stage.includes("kickoff") || stage.includes("planejamento")) return "kickoff";
+  if (stage.includes("campo") || stage.includes("implanta") || stage.includes("validacao") || st.includes("implanta")) return "campo";
   return "dev";
 }
 export const phaseIndex = (k: string) => Math.max(0, PHASES.findIndex(p => p.key === k));
@@ -42,8 +44,7 @@ export function phaseOwner(p: Project, k: PhaseKey = phaseOf(p)): string {
   const set = p.phases?.[k]?.owner?.trim();
   if (set) return set;
   if (k === "dev") return p.integrationOwner || "Dev & Integrações";
-  if (k === "campo" || k === "golive") return p.implementationOwner || "Time de Implantação";
-  if (k === "homolog") return p.implementationOwner || "Cliente";
+  if (k === "campo" || k === "golive" || k === "homolog") return p.implementationOwner || "Time de Implantação";
   return PHASES.find(x => x.key === k)?.defaultOwner || "Não definido";
 }
 
@@ -81,6 +82,8 @@ export function healthOf(p: Project, today = todayISO()): HealthReport {
   else if (idle !== null && idle >= 3) amber.push(`Parado há ${idle} dias`);
   if (due && due >= today && (daysBetween(today, due) ?? 99) <= 2) amber.push("Prazo da fase vence em até 2 dias");
   if (!(p.nextAction || "").trim()) amber.push("Sem próxima ação definida");
+  const missingDocs = docStates(p).filter(d => d.state === "missing");
+  if (missingDocs.length) amber.push(`Documentação pendente: ${missingDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
   if (norm(p.wave) === "congelado") amber.push("Onda congelada");
   return { health: red.length ? "red" : amber.length ? "amber" : "green", reasons: [...red, ...amber], idle, inPhase, due };
 }
@@ -115,8 +118,8 @@ export function movePhasePatch(p: Project, to: PhaseKey, author = "Equipe") {
   const phases: Record<string, PhaseInfo> = { ...(p.phases || {}) };
   phases[from] = { ...(phases[from] || {}), owner: phases[from]?.owner || phaseOwner(p, from), start: phases[from]?.start || phaseSince(p, from), done: phaseIndex(to) > phaseIndex(from) ? today : phases[from]?.done || null };
   phases[to] = { ...(phases[to] || {}), owner: phases[to]?.owner || phaseOwner(p, to), start: today, done: to === "fim" ? today : null };
-  const statusFor: Record<PhaseKey, string> = { kickoff: "Pendente de Integração", dev: "Pendente de Integração", campo: "Pendente de Implantação", homolog: "Pendente de Finalização", golive: "Pendente de Finalização", fim: "Concluído" };
-  const progressFor: Record<PhaseKey, number> = { kickoff: 5, dev: 25, campo: 55, homolog: 80, golive: 92, fim: 100 };
+  const statusFor: Record<PhaseKey, string> = { kickoff: "Pendente de Integração", dev: "Pendente de Integração", homolog: "Pendente de Implantação", campo: "Pendente de Implantação", golive: "Pendente de Finalização", fim: "Concluído" };
+  const progressFor: Record<PhaseKey, number> = { kickoff: 5, dev: 25, homolog: 50, campo: 70, golive: 90, fim: 100 };
   const timeline = [{ id: crypto.randomUUID(), at: now, kind: "fase", author, text: `Fase: ${phaseLabel(from)} → ${phaseLabel(to)}` }, ...(p.timeline || [])].slice(0, 200);
   return {
     phase: to, phases, timeline, lastMovement: today,
@@ -126,3 +129,32 @@ export function movePhasePatch(p: Project, to: PhaseKey, author = "Equipe") {
     wave: to === "fim" ? "Concluído" : p.wave,
   };
 }
+
+
+/* ---------- V8 · Documentos obrigatórios por fase ---------- */
+export type DocState = "ok" | "missing" | "pending" | "skipped" | "future";
+export const DOC_PHASES = PHASES.filter(p => p.doc) as unknown as { key: PhaseKey; label: string; short: string; doc: string; letter: string; optional: boolean }[];
+export const docOf = (p: Project, k: string) => p.phases?.[k]?.doc || null;
+/** Implantação pulada: o projeto passou dela sem nunca ter entrado. */
+const campoSkipped = (p: Project, cur: PhaseKey) => phaseIndex(cur) > phaseIndex("campo") && !p.phases?.campo?.start && !docOf(p, "campo");
+/** Situação do PDF de cada fase: ok (anexado), pending (fase atual sem PDF), missing (fase já passada sem PDF), skipped, future. */
+export function docStates(p: Project): { key: PhaseKey; letter: string; doc: string; label: string; state: DocState }[] {
+  const cur = phaseOf(p), ci = phaseIndex(cur);
+  return DOC_PHASES.map(ph => {
+    const i = phaseIndex(ph.key);
+    let state: DocState = docOf(p, ph.key) ? "ok" : i < ci ? "missing" : i === ci ? "pending" : "future";
+    if (ph.key === "campo" && state === "missing" && campoSkipped(p, cur)) state = "skipped";
+    return { key: ph.key, letter: ph.letter, doc: ph.doc, label: ph.short, state };
+  });
+}
+/** Regra de avanço: só avança com o PDF da fase atual anexado. De Homologação pode ir direto ao Go-live (pulando Implantação). */
+export function canMove(p: Project, to: PhaseKey): { ok: boolean; reason?: string } {
+  const from = phaseOf(p), fi = phaseIndex(from), ti = phaseIndex(to);
+  if (ti <= fi) return { ok: true };
+  const skipsOnlyCampo = from === "homolog" && to === "golive";
+  if (ti - fi > 1 && !skipsOnlyCampo) return { ok: false, reason: "Avance uma fase por vez." };
+  const ph = PHASES[fi];
+  if (ph.doc && !docOf(p, from)) return { ok: false, reason: `Anexe o ${ph.doc.toLowerCase()} (PDF assinado) para sair de ${ph.short}.` };
+  return { ok: true };
+}
+export const docsPending = (p: Project) => docStates(p).filter(d => d.state === "missing" || d.state === "pending");

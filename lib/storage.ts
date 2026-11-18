@@ -9,6 +9,7 @@ import type { EntityName, State } from "./types";
   - Arquivo local data/state.json: modo antigo, quando o Supabase nao esta configurado.
 */
 import { sbLoad, sbReplace, sbSaveDiff, supabaseConfigured } from "./supabase-store";
+import { canMove, phaseOf, type PhaseKey } from "./flow";
 const dbFile=path.join(process.cwd(),"data","state.json");
 export const storageMode=():"supabase"|"file"=>supabaseConfigured()?"supabase":"file";
 const assertWritableHost=()=>{if(process.env.VERCEL==="1"&&storageMode()==="file")throw new Error("Armazenamento nao configurado: defina SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY e ESTEIRA_DB_CHAVE no Vercel.")};
@@ -64,6 +65,9 @@ export function validate(entity:EntityName, value:Record<string,unknown>,s:State
   if(!required(value.name))return "Informe o nome do projeto.";
   if(!s.clients.some(x=>x.id===value.clientId))return "Selecione um cliente existente.";
   if(value.progress!==undefined&&(!Number.isFinite(Number(value.progress))||Number(value.progress)<0||Number(value.progress)>100))return "O avanço deve ficar entre 0 e 100%.";
+  // V8: avanço de fase só com o PDF da fase atual anexado
+  const old=id?s.projects.find(x=>x.id===id):undefined;
+  if(old&&value.phase&&value.phase!==phaseOf(old)){const r=canMove({...old,phases:(value.phases as typeof old.phases)||old.phases},value.phase as PhaseKey);if(!r.ok)return r.reason||"Avanço de fase bloqueado.";}
  }
  if(entity==="tasks"){
   if(!required(value.title))return "Informe a descrição da atividade.";

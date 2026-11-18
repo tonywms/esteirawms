@@ -9,6 +9,8 @@ function apiAllowed(p: Profile, path: string, method: string): string | null {
   const read = method === "GET" || method === "HEAD";
   if (path.startsWith("/api/export")) return canExport(p) ? null : "Seu perfil não pode exportar a base.";
   if (path.startsWith("/api/import")) return canImport(p) ? null : "Somente Administradores e Gestores podem importar a base.";
+  if (path.startsWith("/api/docs/upload")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode anexar documentos.`;
+  if (path.startsWith("/api/docs/view")) return p === "Painel" ? "Perfil Painel: somente a TV." : null;
   if (read) return null;
   const m = path.match(/^\/api\/records\/([^/]+)/);
   if (m) return canWriteEntity(p, m[1], method) ? null : p === "Visualizador" ? "Seu perfil (Visualizador) permite apenas consulta." : `Seu perfil (${p}) não tem permissão para esta alteração.`;

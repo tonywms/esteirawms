@@ -1,11 +1,13 @@
 "use client";
 // V7 · Esteira por ondas: linhas = ondas, colunas = fases (começo → meio → fim).
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Flag, Hand, MessageSquarePlus, Monitor, RefreshCw, Search, Target, Timer, UserRound, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileMinus2, FileText, FileX2, Flag, Hand, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
-import { BALL, PHASES, ballOf, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type Health, type PhaseKey } from "@/lib/flow";
+import { BALL, PHASES, ballOf, canMove, docOf, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
+import type { PhaseDoc } from "@/lib/types";
+import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
 import Select from "./Select";
 
@@ -20,6 +22,12 @@ async function patchProject(id: string, body: Record<string, unknown>) {
   if (!r.ok) throw new Error(j.error || "Falha ao salvar");
   return j as Project;
 }
+
+const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", skipped: "fase não utilizada", future: "fase futura" };
+function DocIcon({ s, size = 13 }: { s: DocState; size?: number }) {
+  return s === "ok" ? <FileCheck2 size={size} /> : s === "skipped" ? <FileMinus2 size={size} /> : s === "future" ? <FileText size={size} /> : <FileX2 size={size} />;
+}
+const fmtSize = (n?: number) => !n ? "" : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
 function Dot({ h }: { h: Health }) { return <span className={`v7-dot v7-${h}`} aria-label={healthLabel[h]} />; }
 
@@ -89,6 +97,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
             <span title="Dias na fase"><Timer size={12} />{h.inPhase ?? "–"}d</span>
             <span className={`v7-ball-chip b-${ballOf(p).split(" ")[0].toLowerCase()}`} title="Com quem está a bola"><Hand size={11} />{ballOf(p)}</span>
           </div>
+          <div className="v7-docs" aria-label="Documentos da esteira">{docStates(p).map(d => <span key={d.key} className={`v7-doc s-${d.state}`} title={`${d.label} · ${d.doc}: ${DOC_STATE_LABEL[d.state]}`}><DocIcon s={d.state} /><b>{d.letter}</b></span>)}</div>
           {h.health !== "done" && (p.nextAction ? <div className="v7-card-next"><Target size={12} />{p.nextAction}</div> : (p.blocker && p.blocker !== "-" ? <div className="v7-card-block"><AlertTriangle size={12} />{p.blocker}</div> : <div className="v7-card-warn">Definir próxima ação</div>))}
         </button>)}
     </div>)}
@@ -97,9 +106,57 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
 
 function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: State; p: Project; onClose: () => void; onRefresh: Props["onRefresh"]; onEdit: Props["onEdit"]; onOpen: Props["onOpen"] }) {
   const k = phaseOf(p), h = healthOf(p), idx = phaseIndex(k);
+  const nextOptions: PhaseKey[] = idx >= PHASES.length - 1 ? [] : k === "homolog" ? ["campo", "golive"] : [PHASES[idx + 1].key];
   const [next, setNext] = useState({ nextAction: p.nextAction || "", nextActionOwner: p.nextActionOwner || "", nextActionDue: p.nextActionDue || "" });
   const [blocker, setBlocker] = useState(p.blocker && p.blocker !== "-" ? p.blocker : "");
-  const [note, setNote] = useState(""), [busy, setBusy] = useState(""), [msg, setMsg] = useState("");
+  const [note, setNote] = useState(""), [busy, setBusy] = useState(""), [msg, setMsg] = useState(""), [msgErr, setMsgErr] = useState(false);
+  const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => setMeName(j.name || "")).catch(() => {}); }, []);
+  const docs = docStates(p);
+  const flash = (text: string, err = false) => { setMsg(text); setMsgErr(err); if (!err) window.setTimeout(() => setMsg(""), 2600); };
+  const pickFile = (k2: PhaseKey) => { setDocPhase(k2); fileRef.current?.click(); };
+  async function uploadDoc(file: File) {
+    const phase = docPhase, meta = PHASES.find(x => x.key === phase)!;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return flash("Envie o documento em PDF.", true);
+    if (file.size > 25 * 1048576) return flash("O PDF deve ter no máximo 25 MB.", true);
+    setBusy("doc"); setPct(0); setMsg("");
+    try {
+      const r = await fetch("/api/docs/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: p.id, phase }) });
+      const t = await r.json(); if (!r.ok) throw new Error(t.error || "Falha ao preparar o envio.");
+      await new Promise<void>((res, rej) => {
+        const x = new XMLHttpRequest(); x.open("POST", t.uploadUrl);
+        x.setRequestHeader("apikey", t.apikey); x.setRequestHeader("Authorization", `Bearer ${t.apikey}`); x.setRequestHeader("Content-Type", "application/pdf"); x.setRequestHeader("x-upsert", "false");
+        x.upload.onprogress = e => { if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100)); };
+        x.onload = () => (x.status < 300 ? res() : rej(new Error(`Falha no envio do PDF (${x.status}). ${x.responseText.slice(0, 120)}`)));
+        x.onerror = () => rej(new Error("Falha de conexão ao enviar o PDF."));
+        x.send(file);
+      });
+      const doc: PhaseDoc = { path: t.path, name: file.name, size: file.size, uploadedAt: new Date().toISOString(), uploadedBy: meName || undefined };
+      const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF anexado · ${meta.doc}: ${file.name}` }, ...(p.timeline || [])].slice(0, 200);
+      await patchProject(p.id, { phases: { ...(p.phases || {}), [phase]: { ...(p.phases?.[phase] || {}), doc } }, timeline: tl, lastMovement: todayISO() });
+      await onRefresh(); flash(`${meta.doc} anexado`);
+    } catch (e) { flash(e instanceof Error ? e.message : "Falha ao anexar.", true); }
+    finally { setBusy(""); setPct(0); if (fileRef.current) fileRef.current.value = ""; }
+  }
+  async function viewDoc(k2: PhaseKey, doc: PhaseDoc) {
+    const w = window.open("about:blank", "_blank");
+    try {
+      const r = await fetch("/api/docs/view", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: p.id, phase: k2, path: doc.path, name: doc.name }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || "Falha ao abrir o documento.");
+      if (w) w.location.href = j.url; else window.location.href = j.url;
+    } catch (e) { w?.close(); flash(e instanceof Error ? e.message : "Falha ao abrir.", true); }
+  }
+  function removeDoc(k2: PhaseKey, doc: PhaseDoc) {
+    const meta = PHASES.find(x => x.key === k2)!;
+    setConfirmBox({ icon: "trash", title: "Remover este documento?", message: `O ${meta.doc.toLowerCase()} deixará de valer para a fase ${meta.short}. Se a fase já foi concluída, o projeto volta a aparecer com documentação pendente.`,
+      details: [{ label: "Arquivo", value: doc.name }, { label: "Fase", value: meta.short }, { label: "Anexado em", value: new Date(doc.uploadedAt).toLocaleString("pt-BR") }], confirmLabel: "Sim, remover documento", cancelLabel: "Manter documento",
+      onConfirm: async () => {
+        const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF removido · ${meta.doc}: ${doc.name}` }, ...(p.timeline || [])].slice(0, 200);
+        await patchProject(p.id, { phases: { ...(p.phases || {}), [k2]: { ...(p.phases?.[k2] || {}), doc: null } }, timeline: tl });
+        await onRefresh(); flash("Documento removido");
+      } });
+  }
   const owners = [...new Set([...data.staff.filter(s => s.active).map(s => s.name), "Time de Implantação", "Dev & Integrações", "Cliente", "ERP Parceiro"])];
   const tasks = data.tasks.filter(t => t.projectId === p.id && !/conclu|cancel/i.test(t.status));
   const apps = data.appointments.filter(a => a.projectId === p.id && a.date && a.date >= todayISO()).sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 4);
@@ -109,8 +166,8 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
     try {
       const tl = event ? [{ id: crypto.randomUUID(), at: new Date().toISOString(), text: event, kind: "nota" }, ...(p.timeline || [])].slice(0, 200) : undefined;
       await patchProject(p.id, { ...body, ...(tl ? { timeline: tl } : {}), lastMovement: todayISO() });
-      await onRefresh(); setMsg("Salvo"); window.setTimeout(() => setMsg(""), 2200);
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Falha ao salvar"); } finally { setBusy(""); }
+      await onRefresh(); flash("Salvo");
+    } catch (e) { flash(e instanceof Error ? e.message : "Falha ao salvar", true); } finally { setBusy(""); }
   }
   const move = (to: PhaseKey) => save("move", movePhasePatch(p, to));
   const setPhaseOwner = (owner: string) => save("owner", { phases: { ...(p.phases || {}), [k]: { ...(p.phases?.[k] || {}), owner, start: p.phases?.[k]?.start || phaseSince(p, k) } } });
@@ -130,7 +187,8 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         <ol className="v7-stepper">{PHASES.map((ph, i) => {
           const info = p.phases?.[ph.key];
           const state = i < idx ? "past" : i === idx ? "now" : "next";
-          return <li key={ph.key} className={state}><span className="v7-step-dot">{i < idx ? <CheckCircle2 size={14} /> : i + 1}</span><div><strong>{ph.short}</strong><small>{i <= idx ? phaseOwner(p, ph.key) : ph.defaultOwner || "—"}</small>{info?.start && <small>{fmtDate(info.start)}{info.done ? ` → ${fmtDate(info.done)}` : ""}</small>}</div></li>;
+          const ds = docs.find(d => d.key === ph.key);
+          return <li key={ph.key} className={`${state}${ph.optional ? " optional" : ""}`}><span className="v7-step-dot">{i < idx ? <CheckCircle2 size={14} /> : i + 1}</span>{ds && <em className={`v7-step-doc s-${ds.state}`} title={`${ds.doc}: ${DOC_STATE_LABEL[ds.state]}`}><DocIcon s={ds.state} size={11} /></em>}<div><strong>{ph.short}</strong>{ph.optional && <small className="v7-opt">opcional</small>}<small>{i <= idx ? phaseOwner(p, ph.key) : ph.defaultOwner || "—"}</small>{info?.start && <small>{fmtDate(info.start)}{info.done ? ` → ${fmtDate(info.done)}` : ""}</small>}</div></li>;
         })}</ol>
 
         {h.reasons.length > 0 && h.health !== "done" && <div className={`v7-reasons v7-${h.health}`}>{h.reasons.map(r => <div key={r}><AlertTriangle size={14} />{r}</div>)}</div>}
@@ -144,8 +202,25 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <div className="v7-ball-switch"><span>Bola com</span>{BALL.map(b => <button key={b} className={ballOf(p) === b ? "on" : ""} disabled={!!busy} onClick={() => void save("ball", { ballWith: b }, `Bola passou para ${b}`)}>{b}</button>)}</div>
           <div className="v7-move">
             <button className="btn outline" disabled={idx === 0 || !!busy} onClick={() => void move(PHASES[idx - 1].key)}><ArrowLeft size={15} /> Voltar fase</button>
-            <button className="btn primary" disabled={idx === PHASES.length - 1 || !!busy} onClick={() => void move(PHASES[idx + 1].key)}>{busy === "move" ? <RefreshCw className="spin" size={15} /> : null}Avançar para {idx < PHASES.length - 1 ? PHASES[idx + 1].short : "—"} <ArrowRight size={15} /></button>
+            {nextOptions.map(to => { const g = canMove(p, to); const skip = k === "homolog" && to === "golive";
+              return <button key={to} className={`btn ${skip ? "outline v7-skip" : "primary"}`} disabled={!g.ok || !!busy} title={g.reason} onClick={() => void move(to)}>{busy === "move" ? <RefreshCw className="spin" size={15} /> : skip ? <SkipForward size={15} /> : null}{skip ? "Pular para Go-live" : `Avançar para ${PHASES[phaseIndex(to)].short}`}{!skip && <ArrowRight size={15} />}</button>; })}
           </div>
+          {nextOptions.length > 0 && !canMove(p, nextOptions[0]).ok && <div className="v7-gate"><FileX2 size={18} /><span>{canMove(p, nextOptions[0]).reason}</span>{PHASES[idx].doc && <button type="button" onClick={() => pickFile(k)} disabled={!!busy}><Upload size={14} /> Anexar agora</button>}</div>}
+        </section>
+
+        <section className="v7-box v7-docs-box">
+          <h3><Paperclip size={15} /> Documentos da esteira <em>{docs.filter(d => d.state === "ok").length}/{docs.filter(d => d.state !== "skipped").length}</em></h3>
+          {docs.map(d => { const doc = docOf(p, d.key); return <div key={d.key} className={`v7-doc-row s-${d.state}`}>
+            <span className="v7-doc-ico"><DocIcon s={d.state} size={18} /></span>
+            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : DOC_STATE_LABEL[d.state]}</small></div>
+            <div className="v7-doc-act">
+              {doc && <button type="button" className="v7-mini-btn" onClick={() => void viewDoc(d.key, doc)}><Eye size={14} /> Ver</button>}
+              <button type="button" className={`v7-mini-btn ${doc ? "" : "primary"}`} disabled={!!busy} onClick={() => pickFile(d.key)}><Upload size={14} /> {doc ? "Substituir" : "Anexar PDF"}</button>
+              {doc && <button type="button" className="v7-mini-btn danger" disabled={!!busy} onClick={() => removeDoc(d.key, doc)} aria-label="Remover documento"><X size={14} /></button>}
+            </div>
+          </div>; })}
+          {busy === "doc" && <div className="v7-upload"><span>Enviando {PHASES.find(x => x.key === docPhase)?.doc.toLowerCase()}… {pct}%</span><i><b style={{ width: `${pct}%` }} /></i></div>}
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
         </section>
 
         <section className="v7-box">
@@ -182,11 +257,12 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         </section>}
       </div>
       <footer className="v7-drawer-foot">
-        <span className="v7-msg">{msg}</span>
+        <span className={`v7-msg${msgErr ? " err" : ""}`}>{msg}</span>
         <button className="btn outline" onClick={() => onEdit(p)}><Wrench size={15} /> Editar cadastro</button>
         <button className="btn outline" onClick={() => onOpen(p)}><ExternalLink size={15} /> Ficha completa</button>
         <span className="v7-owner-tag"><UserRound size={13} />{phaseOwner(p)}</span>
       </footer>
     </aside>
+    {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}
   </div>, document.body);
 }

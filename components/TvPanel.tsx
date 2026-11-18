@@ -1,9 +1,9 @@
 "use client";
 // V7 · Painel de TV: tela cheia, leitura à distância, atualiza a cada 30s e alterna 2 visões a cada 20s.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, Hand, Maximize2, Rocket, Timer } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, FileX2, Hand, Maximize2, Rocket, Timer } from "lucide-react";
 import type { State } from "@/lib/types";
-import { PHASES, ballOf, flowSummary, phaseOwner, type Health } from "@/lib/flow";
+import { PHASES, ballOf, docStates, flowSummary, phaseOwner, type Health } from "@/lib/flow";
 import { fmtDate, todayISO } from "@/lib/metrics";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
@@ -46,7 +46,7 @@ export default function TvPanel() {
       {s.byPhase.map((ph, i) => <div key={ph.key} className={`col ${ph.key === "fim" ? "done" : ""}`}>
         <header><span>{i + 1}</span><strong>{ph.short}</strong><em>{ph.items.length}</em></header>
         <div className="list">{[...ph.items].sort((a, b) => order[a.h.health] - order[b.h.health]).slice(0, 8).map(({ p, h }) =>
-          <div key={p.id} className={`c ${h.health}`}><strong>{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d</small></div>)}
+          <div key={p.id} className={`c ${h.health}`}><strong>{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d</small>{h.health !== "done" && docStates(p).some(d => d.state === "pending" || d.state === "missing") && <em className="pdf" title="Documento pendente"><FileX2 />PDF</em>}</div>)}
           {ph.items.length > 8 && <div className="more">+{ph.items.length - 8} projetos</div>}
         </div>
       </div>)}

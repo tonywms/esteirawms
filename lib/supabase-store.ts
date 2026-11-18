@@ -138,3 +138,23 @@ export async function sbSetPassword(userId: string, password: string) {
   const ok = await rpc<boolean>("esteira_set_password", { p_key: appKey(), p_user_id: userId, p_password: password });
   if (!ok) throw new Error("Usuário não encontrado para definir a senha.");
 }
+
+/* V8 · Documentos (PDF) no Supabase Storage privado, liberados por "ticket" de curta duração. */
+const DOC_BUCKET = "esteira-docs";
+const sbBase = () => (process.env.SUPABASE_URL || "").trim().replace(/\/$/, "");
+const sbPublicKey = () => (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "").trim();
+export async function sbDocUploadTicket(projectId: string, phase: string) {
+  const path = await rpc<string>("esteira_doc_ticket", { p_key: appKey(), p_project_id: projectId, p_phase: phase, p_kind: "up" });
+  return { path, uploadUrl: `${sbBase()}/storage/v1/object/${DOC_BUCKET}/${path.split("/").map(encodeURIComponent).join("/")}`, apikey: sbPublicKey() };
+}
+export async function sbDocSignedUrl(projectId: string, phase: string, path: string, fileName?: string) {
+  await rpc<string>("esteira_doc_ticket", { p_key: appKey(), p_project_id: projectId, p_phase: phase, p_kind: "down", p_path: path });
+  const key = sbPublicKey();
+  const res = await fetch(`${sbBase()}/storage/v1/object/sign/${DOC_BUCKET}/${path.split("/").map(encodeURIComponent).join("/")}`, {
+    method: "POST", cache: "no-store", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 120 }),
+  });
+  const j = await res.json().catch(() => ({})) as { signedURL?: string; message?: string; error?: string };
+  if (!res.ok || !j.signedURL) throw new Error(`Documento indisponível: ${j.message || j.error || res.status}`);
+  const url = `${sbBase()}/storage/v1${j.signedURL}`;
+  return fileName ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(fileName)}` : url;
+}
