@@ -1,7 +1,8 @@
 export type Source = {sheet: string; row: number};
 export type Client = {id:string;name:string;system:string;notes:string;createdAt:string;updatedAt:string;source?:Source;signers?:ClientSigner[]};
 export type ClientSigner = {id:string;name:string;email:string;phone?:string;role?:string;primary?:boolean};
-export type SignRequest = {provider:"zapsign";docToken:string;status:"pending"|"signed"|"refused";sentAt:string;sentBy?:string;fileName:string;signers:{name:string;email?:string;status:string;signUrl?:string;signedAt?:string|null}[];completedAt?:string|null}; /* WMS_ESTEIRA_V13 */
+/* WMS_ESTEIRA_V13_1 */
+export type SignRequest = {provider:"zapsign";docToken:string;status:"pending"|"signed"|"refused";sentAt:string;sentBy?:string;fileName:string;originalPath?:string;signers:{name:string;email?:string;status:string;signUrl?:string;signedAt?:string|null}[];completedAt?:string|null}; /* WMS_ESTEIRA_V13 */
 export type Readiness = {connectivity:string;collectors:string;testBase:string;keyUser:string};
 export type TimelineEvent = {id:string;at:string;text:string;kind?:string;author?:string};
 export type PhaseDoc = {path:string;name:string;size?:number;uploadedAt:string;uploadedBy?:string}; /* WMS_ESTEIRA_V8 */

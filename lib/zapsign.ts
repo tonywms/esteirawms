@@ -44,7 +44,7 @@ export async function zsCreate(o: { name: string; urlPdf: string; externalId: st
 export const zsDetail = (token: string) => zs<ZsDoc>(`/api/v1/docs/${encodeURIComponent(token)}/`);
 
 export const signFromDoc = (d: ZsDoc, prev?: Partial<SignRequest>): SignRequest => ({
-  provider: "zapsign", docToken: d.token, fileName: prev?.fileName || d.name, sentAt: prev?.sentAt || new Date().toISOString(), sentBy: prev?.sentBy,
+  provider: "zapsign", docToken: d.token, fileName: prev?.fileName || d.name, originalPath: prev?.originalPath, sentAt: prev?.sentAt || new Date().toISOString(), sentBy: prev?.sentBy,
   status: d.status === "signed" ? "signed" : d.status === "refused" || d.signers.some(s => s.status === "refused") ? "refused" : "pending",
   signers: d.signers.map(s => ({ name: s.name, email: s.email, status: s.status, signUrl: s.sign_url, signedAt: s.signed_at || null })),
   completedAt: d.status === "signed" ? prev?.completedAt || new Date().toISOString() : null,

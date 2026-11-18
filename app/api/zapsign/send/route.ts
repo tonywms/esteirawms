@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       await transact((s: State) => {
         const pp = s.projects.find(x => x.id === p.id); if (!pp) return;
         const now = new Date().toISOString(), info = { ...(pp.phases?.[ph.key] || {}) };
-        info.sign = signFromDoc(d, { fileName: b.name || `${ph.doc}.pdf`, sentAt: now, sentBy: who.name });
+        info.sign = signFromDoc(d, { fileName: b.name || `${ph.doc}.pdf`, sentAt: now, sentBy: who.name, originalPath: b.path });
         info.docSentAt = now.slice(0, 10); info.docSentBy = who.name;
         pp.phases = { ...(pp.phases || {}), [ph.key]: info };
         if (phaseOf(pp) === ph.key) pp.ballWith = "Cliente";
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       await transact((s: State) => {
         const tt = s.tasks.find(x => x.id === t.id); if (!tt) return;
         const now = new Date().toISOString();
-        tt.attachments = (tt.attachments || []).map(x => (x.id === a.id ? { ...x, sign: signFromDoc(d, { fileName: a.name, sentAt: now, sentBy: who.name }) } : x));
+        tt.attachments = (tt.attachments || []).map(x => (x.id === a.id ? { ...x, sign: signFromDoc(d, { fileName: a.name, sentAt: now, sentBy: who.name, originalPath: a.path }) } : x));
         tt.updatedAt = now;
         const p = s.projects.find(x => x.id === tt.projectId);
         if (p) p.timeline = [{ id: `task-${tt.id}:${crypto.randomUUID()}`, at: now, kind: "atividade", author: who.name, text: `Atividade “${tt.title}”: ${a.name} enviado para assinatura via ZapSign → ${signers.map(x => x.name).join(", ")}` }, ...(p.timeline || [])];

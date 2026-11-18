@@ -667,3 +667,25 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v7-doc-row { flex-wrap: wrap; }
 .v7-doc-row .v7-doc-txt { flex: 1 1 210px; min-width: 0; }
 .v7-doc-row .v7-doc-act { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.v13-sign-panel { flex-basis: 100%; display: grid; gap: 8px; margin-top: 4px; padding: 12px; border-radius: 12px; background: #f4f7ff; border: 1px solid #c7d7fb; }
+.v13-sign-panel.s-refused { background: #fff5f6; border-color: #ffc9d2; }
+.v13-sign-panel.done { display: flex; align-items: center; gap: 7px; padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: #0f7a54; background: #effaf5; border-color: #bfe8d4; }
+.v13-sp-head { display: flex; align-items: center; gap: 7px; color: #1d4ed8; }
+.v13-sign-panel.s-refused .v13-sp-head { color: #c22f49; }
+.v13-sp-head strong { font-size: 12.5px; color: inherit; }
+.v13-sp-head em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 99px; background: #fff; }
+.v13-sign-panel > small { font-size: 11px; color: var(--p6-ink-3); line-height: 1.45; }
+.v13-sign-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.v13-sign-panel li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 7px 9px; border-radius: 10px; background: #fff; font-size: 12px; font-weight: 700; color: var(--p6-ink); }
+.v13-sign-panel li i { width: 8px; height: 8px; border-radius: 50%; background: #e3a008; box-shadow: 0 0 0 3px #fff3d6; }
+.v13-sign-panel li.st-link-opened i { background: #2f7de1; box-shadow: 0 0 0 3px #e3eeff; }
+.v13-sign-panel li.st-signed i { background: #0f9a68; box-shadow: 0 0 0 3px #dcf5ea; }
+.v13-sign-panel li.st-refused i { background: #e0475f; box-shadow: 0 0 0 3px #ffe1e6; }
+.v13-sign-panel li span { font-weight: 500; color: var(--p6-ink-4); font-size: 11px; }
+.v13-sign-panel li b { margin-left: auto; font-size: 10.5px; font-weight: 800; color: var(--p6-ink-3); text-transform: uppercase; letter-spacing: .03em; }
+.v13-sign-panel li.st-signed b { color: #0f7a54; }
+.v13-sign-panel li button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 8px; border: 1px solid #c7d7fb; background: #f4f7ff; color: #1d4ed8; font: inherit; font-size: 10.5px; font-weight: 750; cursor: pointer; }
+.v13-sp-act { display: flex; flex-wrap: wrap; gap: 6px; }
+.v7-gate.zs { background: #f4f7ff; border-color: #c7d7fb; color: #1d4ed8; }
+.v7-gate.zs > svg { color: #1d4ed8; }
+.v7-gate .v13-gate-zs { color: #1d4ed8 !important; background: #fff !important; border: 1px solid #c7d7fb !important; box-shadow: none !important; }
