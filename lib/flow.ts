@@ -84,6 +84,8 @@ export function healthOf(p: Project, today = todayISO()): HealthReport {
   if (!(p.nextAction || "").trim()) amber.push("Sem próxima ação definida");
   const missingDocs = docStates(p).filter(d => d.state === "missing");
   if (missingDocs.length) amber.push(`Documentação pendente: ${missingDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
+  const sentDocs = docStates(p).filter(d => d.state === "sent");
+  if (sentDocs.length) amber.push(`Aguardando assinatura do cliente: ${sentDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
   if (norm(p.wave) === "congelado") amber.push("Onda congelada");
   return { health: red.length ? "red" : amber.length ? "amber" : "green", reasons: [...red, ...amber], idle, inPhase, due };
 }
@@ -132,7 +134,7 @@ export function movePhasePatch(p: Project, to: PhaseKey, author = "Equipe") {
 
 
 /* ---------- V8 · Documentos obrigatórios por fase ---------- */
-export type DocState = "ok" | "missing" | "pending" | "skipped" | "future";
+export type DocState = "ok" | "missing" | "pending" | "sent" | "skipped" | "future";
 export const DOC_PHASES = PHASES.filter(p => p.doc) as unknown as { key: PhaseKey; label: string; short: string; doc: string; letter: string; optional: boolean }[];
 export const docOf = (p: Project, k: string) => p.phases?.[k]?.doc || null;
 /** Implantação pulada: o projeto passou dela sem nunca ter entrado. */
@@ -144,6 +146,7 @@ export function docStates(p: Project): { key: PhaseKey; letter: string; doc: str
     const i = phaseIndex(ph.key);
     let state: DocState = docOf(p, ph.key) ? "ok" : i < ci ? "missing" : i === ci ? "pending" : "future";
     if (ph.key === "campo" && state === "missing" && campoSkipped(p, cur)) state = "skipped";
+    if ((state === "pending" || state === "missing") && p.phases?.[ph.key]?.docSentAt) state = "sent";
     return { key: ph.key, letter: ph.letter, doc: ph.doc, label: ph.short, state };
   });
 }
@@ -157,4 +160,34 @@ export function canMove(p: Project, to: PhaseKey): { ok: boolean; reason?: strin
   if (ph.doc && !docOf(p, from)) return { ok: false, reason: `Anexe o ${ph.doc.toLowerCase()} (PDF assinado) para sair de ${ph.short}.` };
   return { ok: true };
 }
-export const docsPending = (p: Project) => docStates(p).filter(d => d.state === "missing" || d.state === "pending");
+export const docsPending = (p: Project) => docStates(p).filter(d => d.state === "missing" || d.state === "pending" || d.state === "sent");
+
+/* ---------- V8.1 · Destravar a onda (painel de TV) ---------- */
+export type DocGap = { p: Project; key: PhaseKey; doc: string; label: string; letter: string; state: DocState; blocks: boolean; owner: string; days: number };
+/** Tudo o que a equipe precisa saber para a onda andar: quem pode avançar já, o que falta de PDF e com quem está. */
+export function unlockSummary(s: State, today = todayISO()) {
+  const active = s.projects.filter(p => !isArchived(p, today)).filter(p => phaseOf(p) !== "fim" && !isDone(p.status));
+  const ready = active.filter(p => { const k = phaseOf(p); return !!PHASES[phaseIndex(k)].doc && !!docOf(p, k); })
+    .map(p => { const k = phaseOf(p); const to = k === "homolog" ? "campo" : PHASES[phaseIndex(k) + 1].key; return { p, from: k, to: to as PhaseKey, days: daysBetween(p.phases?.[k]?.doc?.uploadedAt, today) ?? 0 }; })
+    .sort((a, b) => b.days - a.days);
+  const gaps: DocGap[] = [];
+  for (const p of active) for (const d of docStates(p)) {
+    if (d.state !== "pending" && d.state !== "missing" && d.state !== "sent") continue;
+    const info = p.phases?.[d.key];
+    const since = d.state === "sent" ? info?.docSentAt : d.state === "pending" ? phaseSince(p, d.key) : info?.done || info?.start || phaseSince(p);
+    gaps.push({ p, key: d.key, doc: d.doc, label: d.label, letter: d.letter, state: d.state, blocks: d.key === phaseOf(p), owner: d.state === "sent" ? "Cliente (assinatura)" : phaseOwner(p, d.key), days: daysBetween(since, today) ?? 0 });
+  }
+  gaps.sort((a, b) => Number(b.blocks) - Number(a.blocks) || Number(a.state === "sent") - Number(b.state === "sent") || b.days - a.days);
+  const blocked = gaps.filter(g => g.blocks);
+  const ownerMap = new Map<string, { name: string; total: number; blocks: number; letters: Record<string, number> }>();
+  for (const g of gaps) { const o = ownerMap.get(g.owner) || { name: g.owner, total: 0, blocks: 0, letters: {} }; o.total++; if (g.blocks) o.blocks++; o.letters[g.letter] = (o.letters[g.letter] || 0) + 1; ownerMap.set(g.owner, o); }
+  const owners = [...ownerMap.values()].sort((a, b) => b.blocks - a.blocks || b.total - a.total);
+  const coverage = DOC_PHASES.map(ph => {
+    let ok = 0, need = 0, sent = 0;
+    for (const p of s.projects.filter(x => !isArchived(x, today))) { const st = docStates(p).find(d => d.key === ph.key)!.state; if (st === "future" || st === "skipped") continue; need++; if (st === "ok") ok++; if (st === "sent") sent++; }
+    return { key: ph.key, letter: ph.letter, short: ph.short, ok, sent, need, pct: need ? Math.round((ok / need) * 100) : 100 };
+  });
+  const movedWeek = active.filter(p => { const k = phaseOf(p); const st = p.phases?.[k]?.start; return k !== "kickoff" && !!st && (daysBetween(st, today) ?? 99) <= 6; }).length
+    + s.projects.filter(p => phaseOf(p) === "fim" && (daysBetween(p.phases?.fim?.start, today) ?? 99) <= 6).length;
+  return { ready, gaps, blocked, owners, coverage, movedWeek, sent: gaps.filter(g => g.state === "sent").length };
+}

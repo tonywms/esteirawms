@@ -3,7 +3,7 @@
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileMinus2, FileText, FileX2, Flag, Hand, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, Hand, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, Send, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
 import { BALL, PHASES, ballOf, canMove, docOf, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
 import type { PhaseDoc } from "@/lib/types";
@@ -23,9 +23,9 @@ async function patchProject(id: string, body: Record<string, unknown>) {
   return j as Project;
 }
 
-const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", skipped: "fase não utilizada", future: "fase futura" };
+const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", sent: "enviado ao cliente — aguardando assinatura", skipped: "fase não utilizada", future: "fase futura" };
 function DocIcon({ s, size = 13 }: { s: DocState; size?: number }) {
-  return s === "ok" ? <FileCheck2 size={size} /> : s === "skipped" ? <FileMinus2 size={size} /> : s === "future" ? <FileText size={size} /> : <FileX2 size={size} />;
+  return s === "ok" ? <FileCheck2 size={size} /> : s === "sent" ? <FileClock size={size} /> : s === "skipped" ? <FileMinus2 size={size} /> : s === "future" ? <FileText size={size} /> : <FileX2 size={size} />;
 }
 const fmtSize = (n?: number) => !n ? "" : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
@@ -134,7 +134,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
       });
       const doc: PhaseDoc = { path: t.path, name: file.name, size: file.size, uploadedAt: new Date().toISOString(), uploadedBy: meName || undefined };
       const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF anexado · ${meta.doc}: ${file.name}` }, ...(p.timeline || [])].slice(0, 200);
-      await patchProject(p.id, { phases: { ...(p.phases || {}), [phase]: { ...(p.phases?.[phase] || {}), doc } }, timeline: tl, lastMovement: todayISO() });
+      await patchProject(p.id, { phases: { ...(p.phases || {}), [phase]: { ...(p.phases?.[phase] || {}), doc, docSentAt: null } }, timeline: tl, lastMovement: todayISO() });
       await onRefresh(); flash(`${meta.doc} anexado`);
     } catch (e) { flash(e instanceof Error ? e.message : "Falha ao anexar.", true); }
     finally { setBusy(""); setPct(0); if (fileRef.current) fileRef.current.value = ""; }
@@ -156,6 +156,16 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         await patchProject(p.id, { phases: { ...(p.phases || {}), [k2]: { ...(p.phases?.[k2] || {}), doc: null } }, timeline: tl });
         await onRefresh(); flash("Documento removido");
       } });
+  }
+  async function toggleSent(k2: PhaseKey) {
+    const meta = PHASES.find(x => x.key === k2)!, on = !p.phases?.[k2]?.docSentAt, cur = k2 === k;
+    const text = on ? `${meta.doc} enviado ao cliente para assinatura` : `${meta.doc}: envio ao cliente desmarcado`;
+    const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text }, ...(p.timeline || [])].slice(0, 200);
+    setBusy("sent");
+    try {
+      await patchProject(p.id, { phases: { ...(p.phases || {}), [k2]: { ...(p.phases?.[k2] || {}), docSentAt: on ? todayISO() : null, docSentBy: on ? meName || undefined : undefined } }, timeline: tl, lastMovement: todayISO(), ...(on && cur ? { ballWith: "Cliente" } : {}) });
+      await onRefresh(); flash(on ? (cur ? "Marcado como enviado · bola com o Cliente" : "Marcado como enviado ao cliente") : "Envio desmarcado");
+    } catch (e) { flash(e instanceof Error ? e.message : "Falha ao salvar.", true); } finally { setBusy(""); }
   }
   const owners = [...new Set([...data.staff.filter(s => s.active).map(s => s.name), "Time de Implantação", "Dev & Integrações", "Cliente", "ERP Parceiro"])];
   const tasks = data.tasks.filter(t => t.projectId === p.id && !/conclu|cancel/i.test(t.status));
@@ -212,8 +222,9 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <h3><Paperclip size={15} /> Documentos da esteira <em>{docs.filter(d => d.state === "ok").length}/{docs.filter(d => d.state !== "skipped").length}</em></h3>
           {docs.map(d => { const doc = docOf(p, d.key); return <div key={d.key} className={`v7-doc-row s-${d.state}`}>
             <span className="v7-doc-ico"><DocIcon s={d.state} size={18} /></span>
-            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : DOC_STATE_LABEL[d.state]}</small></div>
+            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : DOC_STATE_LABEL[d.state]}{!doc && d.state === "sent" && p.phases?.[d.key]?.docSentAt ? ` desde ${fmtDate(p.phases[d.key]!.docSentAt)}` : ""}</small></div>
             <div className="v7-doc-act">
+              {!doc && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className={`v7-mini-btn sent ${d.state === "sent" ? "on" : ""}`} disabled={!!busy} onClick={() => void toggleSent(d.key)} title={d.state === "sent" ? "Desmarcar envio" : "Marcar que o documento foi enviado ao cliente para assinatura"}><Send size={14} /> {d.state === "sent" ? "Enviado" : "Enviado ao cliente"}</button>}
               {doc && <button type="button" className="v7-mini-btn" onClick={() => void viewDoc(d.key, doc)}><Eye size={14} /> Ver</button>}
               <button type="button" className={`v7-mini-btn ${doc ? "" : "primary"}`} disabled={!!busy} onClick={() => pickFile(d.key)}><Upload size={14} /> {doc ? "Substituir" : "Anexar PDF"}</button>
               {doc && <button type="button" className="v7-mini-btn danger" disabled={!!busy} onClick={() => removeDoc(d.key, doc)} aria-label="Remover documento"><X size={14} /></button>}
