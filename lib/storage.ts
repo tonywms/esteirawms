@@ -74,6 +74,11 @@ export function validate(entity:EntityName, value:Record<string,unknown>,s:State
  }
  if(entity==="tasks"){
   if(!required(value.title))return "Informe a descrição da atividade.";
+  // V11: atividade nova só entra com responsável e prazo; uma atividade com prazo não pode perdê-lo
+  const oldTask=id?s.tasks.find(x=>x.id===id):undefined;
+  if(!oldTask&&!required(value.owner))return "Informe o responsável da atividade.";
+  if(!oldTask&&!required(value.dueDate))return "Informe o prazo da atividade. Sem prazo ninguém cobra.";
+  if(oldTask?.dueDate&&!required(value.dueDate))return "A atividade já tem prazo; altere a data em vez de apagá-la.";
   if(!s.projects.some(x=>x.id===value.projectId))return "Selecione um projeto válido.";
   if(value.startDate&&value.dueDate&&String(value.dueDate)<String(value.startDate))return "O prazo não pode ser anterior ao início.";
  }

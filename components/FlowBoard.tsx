@@ -10,6 +10,7 @@ import type { PhaseDoc } from "@/lib/types";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import MasterDialog, { type MasterBox } from "./MasterDialog";
 import EscalateDialog from "./EscalateDialog";
+import ReportDialog from "./ReportDialog";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
 import Select from "./Select";
 
@@ -28,7 +29,7 @@ async function patchProject(id: string, body: Record<string, unknown>) {
 // V10 · tipos de registro da linha do tempo (atividades e agenda entram sozinhas)
 const TL_KINDS: Record<string, { label: string; Icon: typeof ListChecks }> = {
   atividade: { label: "Atividades", Icon: ListChecks }, agenda: { label: "Agenda", Icon: CalendarClock }, fase: { label: "Fases", Icon: GitBranch },
-  doc: { label: "Documentos", Icon: Paperclip }, escalonamento: { label: "Escalonamentos", Icon: Megaphone }, master: { label: "Master", Icon: ShieldCheck }, nota: { label: "Notas", Icon: MessageSquare },
+  doc: { label: "Documentos", Icon: Paperclip }, escalonamento: { label: "Escalonamentos", Icon: Megaphone }, master: { label: "Master", Icon: ShieldCheck }, report: { label: "Relatórios", Icon: FileText }, nota: { label: "Notas", Icon: MessageSquare },
 };
 const tlGroup = (k?: string) => (k && TL_KINDS[k] ? k : "nota");
 const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", waived: "liberado sem PDF (master)", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", sent: "enviado ao cliente — aguardando assinatura", skipped: "fase não utilizada", future: "fase futura" };
@@ -119,7 +120,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   const [blocker, setBlocker] = useState(p.blocker && p.blocker !== "-" ? p.blocker : "");
   const [note, setNote] = useState(""), [busy, setBusy] = useState(""), [msg, setMsg] = useState(""), [msgErr, setMsgErr] = useState(false);
   const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState(""), [meEmail, setMeEmail] = useState("");
-  const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false);
+  const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false), [report, setReport] = useState(false);
   const [tlKind, setTlKind] = useState(""), [tlAll, setTlAll] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => { setMeName(j.name || ""); setMeEmail(j.email || ""); }).catch(() => {}); }, []);
@@ -247,6 +248,12 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
         </section>
 
+        <section className="v9-action report">
+          <span className="v9-action-ico"><FileText size={20} /></span>
+          <div className="v9-action-txt"><h3>Status report para o cliente</h3><p>Relatório com andamento por etapa, próximos passos, histórico e os PDFs assinados de cada fase anexados. Baixe ou envie por e-mail.</p></div>
+          <div className="v9-action-btns"><button type="button" className="v9-btn report" onClick={() => setReport(true)} disabled={!!busy}><FileText size={15} /> Gerar status report</button></div>
+        </section>
+
         <section className="v9-action esc">
           <span className="v9-action-ico"><Megaphone size={20} /></span>
           <div className="v9-action-txt"><h3>Escalonar entrave</h3><p>Envie o histórico do projeto em PDF (marca WMS Expert) ao Comercial, à Diretoria ou a quem precisar intervir. Fica registrado na linha do tempo.</p></div>
@@ -309,6 +316,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
     </aside>
     {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}
     {masterBox && <MasterDialog box={masterBox} onClose={() => setMasterBox(null)} onDone={async msg => { await onRefresh(); flash(msg); if (masterBox.action === "cancel" || masterBox.action === "close") window.setTimeout(onClose, 900); }} />}
+    {report && <ReportDialog data={data} project={p} client={client} onClose={() => setReport(false)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
     {escalate && <EscalateDialog data={data} project={p} client={client} onClose={() => setEscalate(false)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
   </div>, document.body);
 }

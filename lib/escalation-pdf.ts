@@ -18,11 +18,11 @@ const W = 595.28, H = 841.89, M = 42, FOOT = 46;
 // WinAnsi (fontes padrão do PDF): troca símbolos que não existem nela.
 const MAP: Record<string, string> = { "→": "->", "←": "<-", "✓": "OK", "✕": "X", "≥": ">=", "≤": "<=", "…": "...", " ": " ", "\t": " " };
 const WIN = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
-const clean = (v: unknown) => [...String(v ?? "")].map(ch => MAP[ch] ?? ch).join("").split("").filter(ch => { const c = ch.charCodeAt(0); return ch === "\n" || (c >= 32 && c <= 126) || (c >= 160 && c <= 255) || WIN.has(ch); }).join("");
+export const clean = (v: unknown) => [...String(v ?? "")].map(ch => MAP[ch] ?? ch).join("").split("").filter(ch => { const c = ch.charCodeAt(0); return ch === "\n" || (c >= 32 && c <= 126) || (c >= 160 && c <= 255) || WIN.has(ch); }).join("");
 const fmt = (d?: string | null) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "—");
 const fmtDT = (d?: string | null) => { if (!d) return "—"; const x = new Date(d); return Number.isNaN(x.getTime()) ? fmt(d) : x.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }); };
 
-function wrap(text: string, font: PDFFont, size: number, max: number): string[] {
+export function wrap(text: string, font: PDFFont, size: number, max: number): string[] {
   const out: string[] = [];
   for (const para of clean(text).split("\n")) {
     let line = "";
@@ -181,7 +181,7 @@ export async function buildEscalationPdf(s: State, p: Project, input: Escalation
     const lines = wrap(e.text, font, 9.2, W - 2 * M - 128);
     need(lines.length * 12.5 + 10);
     const top = y;
-    page.drawCircle({ x: M + 4, y: top + 3, size: 2.6, color: e.kind === "master" ? C.violet : e.kind === "escalonamento" ? C.red : e.kind === "doc" ? C.green : e.kind === "atividade" ? rgb(0.18, 0.49, 0.88) : e.kind === "agenda" ? C.teal : e.kind === "fase" ? C.navy : C.grey });
+    page.drawCircle({ x: M + 4, y: top + 3, size: 2.6, color: e.kind === "master" ? C.violet : e.kind === "escalonamento" ? C.red : e.kind === "doc" ? C.green : e.kind === "atividade" ? rgb(0.18, 0.49, 0.88) : e.kind === "agenda" ? C.teal : e.kind === "fase" ? C.navy : e.kind === "report" ? C.teal : C.grey });
     text(fmtDT(e.at), M + 14, top, 8.2, bold, C.ink2);
     if (e.author) text(wrap(e.author, font, 7.5, 100)[0], M + 14, top - 10, 7.5, font, C.ink3);
     lines.forEach((l, i) => text(l, M + 128, top - i * 12.5, 9.2, font, C.ink));
