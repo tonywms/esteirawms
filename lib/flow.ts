@@ -100,6 +100,8 @@ export function healthOf(p: Project, today = todayISO(), tasks?: Task[]): Health
   if (!(p.nextAction || "").trim()) amber.push("Sem próxima ação definida");
   const missingDocs = docStates(p).filter(d => d.state === "missing");
   if (missingDocs.length) amber.push(`Documentação pendente: ${missingDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
+  const refused = PHASES.filter(ph => ph.doc && p.phases?.[ph.key]?.sign?.status === "refused" && !p.phases?.[ph.key]?.doc);
+  if (refused.length) red.push(`Assinatura recusada na ZapSign: ${refused.map(ph => ph.doc.replace("Documento de ", "")).join(", ")}`);
   const sentDocs = docStates(p).filter(d => d.state === "sent");
   if (sentDocs.length) amber.push(`Aguardando assinatura do cliente: ${sentDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
   if (norm(p.wave) === "congelado") amber.push("Onda congelada");

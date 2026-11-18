@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, authEnabled, onVercel, readSession, safeEqual, signSession, tvKey } from "@/lib/auth";
 import { asProfile, canExport, canImport, canSeePath, canWriteEntity, homeFor, type Profile } from "@/lib/permissions";
 
-const PUBLIC = ["/entrar", "/api/auth"];
+const PUBLIC = ["/entrar", "/api/auth", "/api/zapsign/webhook"]; // o webhook valida a própria chave
 const LEGACY: Record<string, Profile> = { admin: "Administrador", editor: "Analista", viewer: "Visualizador" };
 
 function apiAllowed(p: Profile, path: string, method: string): string | null {
@@ -11,6 +11,7 @@ function apiAllowed(p: Profile, path: string, method: string): string | null {
   if (path.startsWith("/api/import")) return canImport(p) ? null : "Somente Administradores e Gestores podem importar a base.";
   if (path.startsWith("/api/docs/upload")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode anexar documentos.`;
   if (path.startsWith("/api/docs/view")) return p === "Painel" ? "Perfil Painel: somente a TV." : null;
+  if (path.startsWith("/api/zapsign/send") || path.startsWith("/api/zapsign/sync")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode enviar documentos para assinatura.`;
   if (path.startsWith("/api/tasks/attachments")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "tasks", "PATCH") ? null : `Seu perfil (${p}) não pode anexar arquivos.`;
   if (path.startsWith("/api/flow/override") || path.startsWith("/api/escalate") || path.startsWith("/api/report")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode executar esta ação.`;
   if (read) return null;

@@ -7,7 +7,7 @@ type Row = Record<string, unknown>;
 type Kind = "text" | "textnull" | "int" | "bool" | "boolf" | "date" | "ts" | "json";
 const T = (spec: Record<string, Kind>) => spec;
 const TABLES = {
-  clients: T({ id: "text", name: "text", system: "text", notes: "text", source: "json", created_at: "ts", updated_at: "ts" }),
+  clients: T({ id: "text", name: "text", system: "text", notes: "text", source: "json", signers: "json", created_at: "ts", updated_at: "ts" }),
   staff: T({ id: "text", name: "text", role: "text", capacity: "int", active: "bool", email: "textnull", sector: "textnull", escalation: "boolf", created_at: "ts", updated_at: "ts" }),
   workspace_users: T({ id: "text", name: "text", email: "text", role: "text", active: "bool", notes: "text", created_at: "ts", updated_at: "ts" }),
   projects: T({
@@ -46,7 +46,7 @@ function toRow(table: Table, obj: Row): Row {
       case "boolf": out[col] = v === true || v === "true"; break;
       case "date": out[col] = typeof v === "string" && ISO_DAY.test(v) ? v.slice(0, 10) : null; break;
       case "ts": out[col] = typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : col === "archived_at" ? null : new Date().toISOString(); break;
-      case "json": out[col] = v == null ? (col === "source" ? null : col === "attachments" ? [] : {}) : v; break;
+      case "json": out[col] = v == null ? (col === "source" ? null : col === "attachments" || col === "signers" ? [] : {}) : v; break;
     }
   }
   return out;
@@ -176,4 +176,10 @@ export async function sbFileSignedUrl(projectId: string, taskId: string, path: s
   if (!res.ok || !j.signedURL) throw new Error(`Arquivo indisponível: ${j.message || j.error || res.status}`);
   const url = `${sbBase()}/storage/v1${j.signedURL}`;
   return fileName ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(fileName)}` : url;
+}
+
+/* ---------- V13 · Upload feito pelo servidor (ex.: PDF assinado devolvido pela ZapSign) ---------- */
+export async function sbUploadBytes(uploadUrl: string, apikey: string, bytes: Uint8Array, contentType = "application/pdf") {
+  const res = await fetch(uploadUrl, { method: "POST", headers: { apikey, Authorization: `Bearer ${apikey}`, "Content-Type": contentType, "x-upsert": "false" }, body: Buffer.from(bytes) });
+  if (!res.ok) throw new Error(`Falha ao guardar o arquivo (${res.status}).`);
 }

@@ -3,7 +3,7 @@
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, GitBranch, Hand, ListChecks, MessageSquare, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, GitBranch, Hand, ListChecks, MessageSquare, MessageSquarePlus, PenLine, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
 import { BALL, PHASES, ballOf, canMove, docOf, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
 import type { PhaseDoc } from "@/lib/types";
@@ -11,6 +11,7 @@ import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import MasterDialog, { type MasterBox } from "./MasterDialog";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
+import SignDialog, { type SignTarget } from "./SignDialog";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
 import Select from "./Select";
 
@@ -120,7 +121,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   const [blocker, setBlocker] = useState(p.blocker && p.blocker !== "-" ? p.blocker : "");
   const [note, setNote] = useState(""), [busy, setBusy] = useState(""), [msg, setMsg] = useState(""), [msgErr, setMsgErr] = useState(false);
   const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState(""), [meEmail, setMeEmail] = useState("");
-  const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false), [report, setReport] = useState(false);
+  const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false), [report, setReport] = useState(false), [signTarget, setSignTarget] = useState<SignTarget | null>(null);
   const [tlKind, setTlKind] = useState(""), [tlAll, setTlAll] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => { setMeName(j.name || ""); setMeEmail(j.email || ""); }).catch(() => {}); }, []);
@@ -170,6 +171,15 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   }
   const client = clientName(data, p.clientId);
   const openMaster = (action: MasterBox["action"], phase?: PhaseKey) => setMasterBox({ action, projectId: p.id, client, current: PHASES[idx].short, phase, phaseLabel: phase ? PHASES.find(x => x.key === phase)?.doc : undefined, options: nextOptions.map(k2 => ({ key: k2, label: PHASES[phaseIndex(k2)].short })), defaultEmail: meEmail });
+  async function syncSign(k2: PhaseKey) {
+    setBusy("sync");
+    try {
+      const r = await fetch("/api/zapsign/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: p.id, phase: k2 }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Falha ao consultar a ZapSign.");
+      await onRefresh(); flash(j.message || "Status atualizado");
+    } catch (e) { flash(e instanceof Error ? e.message : "Falha ao consultar a ZapSign.", true); } finally { setBusy(""); }
+  }
   async function toggleSent(k2: PhaseKey) {
     const meta = PHASES.find(x => x.key === k2)!, on = !p.phases?.[k2]?.docSentAt, cur = k2 === k;
     const text = on ? `${meta.doc} enviado ao cliente para assinatura` : `${meta.doc}: envio ao cliente desmarcado`;
@@ -235,9 +245,11 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <h3><Paperclip size={15} /> Documentos da esteira <em>{docs.filter(d => d.state === "ok" || d.state === "waived").length}/{docs.filter(d => d.state !== "skipped").length}</em></h3>
           {docs.map(d => { const doc = docOf(p, d.key); return <div key={d.key} className={`v7-doc-row s-${d.state}`}>
             <span className="v7-doc-ico"><DocIcon s={d.state} size={18} /></span>
-            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : (d.state === "waived" && p.phases?.[d.key]?.docWaived ? `liberado sem PDF por ${p.phases[d.key]!.docWaived!.by} em ${new Date(p.phases[d.key]!.docWaived!.at).toLocaleDateString("pt-BR")} · ${p.phases[d.key]!.docWaived!.reason}` : DOC_STATE_LABEL[d.state])}{!doc && d.state === "sent" && p.phases?.[d.key]?.docSentAt ? ` desde ${fmtDate(p.phases[d.key]!.docSentAt)}` : ""}</small></div>
+            <div className="v7-doc-txt"><strong>{d.doc}</strong><small>{d.label} · {doc ? `${doc.name}${doc.size ? " · " + fmtSize(doc.size) : ""} · ${new Date(doc.uploadedAt).toLocaleDateString("pt-BR")}${doc.uploadedBy ? " · " + doc.uploadedBy : ""}` : (d.state === "waived" && p.phases?.[d.key]?.docWaived ? `liberado sem PDF por ${p.phases[d.key]!.docWaived!.by} em ${new Date(p.phases[d.key]!.docWaived!.at).toLocaleDateString("pt-BR")} · ${p.phases[d.key]!.docWaived!.reason}` : DOC_STATE_LABEL[d.state])}{!doc && d.state === "sent" && p.phases?.[d.key]?.docSentAt ? ` desde ${fmtDate(p.phases[d.key]!.docSentAt)}` : ""}{(() => { const sg = p.phases?.[d.key]?.sign; if (!sg || doc) return null; const n = sg.signers.filter(x => x.status === "signed").length; return <em className={`v13-zs s-${sg.status}`}><PenLine size={11} /> ZapSign: {sg.status === "refused" ? "recusado" : `${n}/${sg.signers.length} assinaram`} · {sg.signers.map(x => x.name.split(" ")[0]).join(", ")}</em>; })()}</small></div>
             <div className="v7-doc-act">
-              {!doc && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className={`v7-mini-btn sent ${d.state === "sent" ? "on" : ""}`} disabled={!!busy} onClick={() => void toggleSent(d.key)} title={d.state === "sent" ? "Desmarcar envio" : "Marcar que o documento foi enviado ao cliente para assinatura"}><Send size={14} /> {d.state === "sent" ? "Enviado" : "Enviado ao cliente"}</button>}
+              {!doc && p.phases?.[d.key]?.sign?.status === "pending" ? <button type="button" className="v7-mini-btn zs" disabled={!!busy} onClick={() => void syncSign(d.key)} title="Conferir agora na ZapSign"><RefreshCw size={14} className={busy === "sync" ? "spin" : ""} /> Atualizar</button>
+                : !doc && d.state !== "waived" && <button type="button" className="v7-mini-btn zs" disabled={!!busy} onClick={() => setSignTarget({ kind: "phase", projectId: p.id, phase: d.key, docLabel: d.doc, client: data.clients.find(c => c.id === p.clientId) })} title="Enviar para assinatura na ZapSign"><PenLine size={14} /> Assinar</button>}
+              {!doc && !p.phases?.[d.key]?.sign && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className={`v7-mini-btn sent ${d.state === "sent" ? "on" : ""}`} disabled={!!busy} onClick={() => void toggleSent(d.key)} title={d.state === "sent" ? "Desmarcar envio" : "Marcar que o documento foi enviado ao cliente para assinatura"}><Send size={14} /> {d.state === "sent" ? "Enviado" : "Enviado ao cliente"}</button>}
               {doc && <button type="button" className="v7-mini-btn" onClick={() => void viewDoc(d.key, doc)}><Eye size={14} /> Ver</button>}
               {!doc && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className="v7-mini-btn master" disabled={!!busy} onClick={() => openMaster("waive", d.key)} title="Dispensar este PDF (usuário master)" aria-label="Dispensar PDF (master)"><ShieldCheck size={14} /></button>}
               <button type="button" className={`v7-mini-btn ${doc ? "" : "primary"}`} disabled={!!busy} onClick={() => pickFile(d.key)}><Upload size={14} /> {doc ? "Substituir" : "Anexar PDF"}</button>
@@ -316,6 +328,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
     </aside>
     {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}
     {masterBox && <MasterDialog box={masterBox} onClose={() => setMasterBox(null)} onDone={async msg => { await onRefresh(); flash(msg); if (masterBox.action === "cancel" || masterBox.action === "close") window.setTimeout(onClose, 900); }} />}
+    {signTarget && <SignDialog target={signTarget} onClose={() => setSignTarget(null)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
     {report && <ReportDialog data={data} project={p} client={client} onClose={() => setReport(false)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
     {escalate && <EscalateDialog data={data} project={p} client={client} onClose={() => setEscalate(false)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
   </div>, document.body);

@@ -95,6 +95,11 @@ export function validate(entity:EntityName, value:Record<string,unknown>,s:State
   if(!["Administrador","Gestor","Analista","Consultor","Visualizador","Painel"].includes(String(value.role)))return "Selecione um perfil válido.";
   if(existing.some(x=>x.id!==id&&(x as unknown as {email:string}).email.toLowerCase()===String(value.email).trim().toLowerCase()))return "O e-mail já está cadastrado.";
  }
+ if(entity==="clients"&&Array.isArray(value.signers)){
+  const sg=value.signers as {name?:string;email?:string;phone?:string}[];
+  if(sg.length>10)return "Máximo de 10 contatos para assinatura por cliente.";
+  for(const x of sg){if(!required(x.name))return "Informe o nome de cada contato para assinatura.";if(!x.email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(x.email).trim()))return `Informe um e-mail válido para ${x.name}.`;}
+ }
  if(entity==="staff"){
   if(!required(value.name))return "Informe o nome do profissional.";
   if(value.email&&String(value.email).trim()&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value.email).trim()))return "Informe um e-mail válido para o profissional.";

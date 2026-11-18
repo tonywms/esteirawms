@@ -18,6 +18,8 @@ export async function PATCH(request:Request,context:C){
    const value={...row,...patch};
    if(entity==="tasks"||entity==="appointments")value.clientId=state.projects.find(p=>p.id===value.projectId)?.clientId||"";
    if(entity==="projects")value.system=state.clients.find(c=>c.id===value.clientId)?.system||"";
+   // V13: o estado da ZapSign é do servidor (webhook) — uma tela desatualizada não pode apagá-lo
+   if(entity==="projects"&&value.phases&&row.phases){const rp=row.phases as Record<string,{sign?:unknown;doc?:{uploadedBy?:string}|null}>,vp={...(value.phases as Record<string,Record<string,unknown>>)};for(const k of Object.keys(rp)){if(rp[k]?.sign!==undefined){vp[k]={...(vp[k]||{}),sign:rp[k].sign};if(rp[k]?.doc?.uploadedBy==="ZapSign"&&vp[k].doc===undefined)vp[k].doc=rp[k].doc}}value.phases=vp}
    const issue=validate(entity,value,state,id);if(issue)throw new Error(issue);
    if(entity==="clients"){
     const oldName=String(row.name||"");
