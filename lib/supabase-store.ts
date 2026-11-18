@@ -17,7 +17,7 @@ const TABLES = {
     phase: "textnull", phases: "json", ball_with: "textnull", next_action: "textnull", next_action_owner: "textnull", next_action_due: "date",
     archived_at: "ts", source: "json", created_at: "ts", updated_at: "ts",
   }),
-  tasks: T({ id: "text", project_id: "text", client_id: "text", title: "text", owner: "text", start_date: "date", due_date: "date", status: "text", blocker: "text", notes: "text", sla_original: "textnull", source: "json", created_at: "ts", updated_at: "ts" }),
+  tasks: T({ id: "text", project_id: "text", client_id: "text", title: "text", owner: "text", start_date: "date", due_date: "date", status: "text", blocker: "text", notes: "text", sla_original: "textnull", source: "json", attachments: "json", created_at: "ts", updated_at: "ts" }),
   appointments: T({ id: "text", project_id: "text", client_id: "text", consultant: "text", date: "date", shift: "text", modality: "text", title: "text", status: "text", notes: "text", message: "text", source_week: "textnull", source: "json", created_at: "ts", updated_at: "ts" }),
   project_events: T({ id: "text", project_id: "text", at: "ts", text: "text", kind: "textnull", author: "textnull" }),
   audit_log: T({ id: "text", at: "ts", entity: "text", operation: "text", record_id: "text", label: "text" }),
@@ -46,7 +46,7 @@ function toRow(table: Table, obj: Row): Row {
       case "boolf": out[col] = v === true || v === "true"; break;
       case "date": out[col] = typeof v === "string" && ISO_DAY.test(v) ? v.slice(0, 10) : null; break;
       case "ts": out[col] = typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : col === "archived_at" ? null : new Date().toISOString(); break;
-      case "json": out[col] = v == null ? (col === "source" ? null : {}) : v; break;
+      case "json": out[col] = v == null ? (col === "source" ? null : col === "attachments" ? [] : {}) : v; break;
     }
   }
   return out;
@@ -156,6 +156,24 @@ export async function sbDocSignedUrl(projectId: string, phase: string, path: str
   });
   const j = await res.json().catch(() => ({})) as { signedURL?: string; message?: string; error?: string };
   if (!res.ok || !j.signedURL) throw new Error(`Documento indisponível: ${j.message || j.error || res.status}`);
+  const url = `${sbBase()}/storage/v1${j.signedURL}`;
+  return fileName ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(fileName)}` : url;
+}
+
+/* ---------- V12 · Fotos e PDFs das atividades (mesmo armazenamento privado, pasta <projeto>/tasks/<atividade>/) ---------- */
+const filePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
+export async function sbFileUploadTicket(projectId: string, taskId: string, ext: string) {
+  const path = await rpc<string>("esteira_file_ticket", { p_key: appKey(), p_project_id: projectId, p_task_id: taskId, p_kind: "up", p_ext: ext });
+  return { path, uploadUrl: `${sbBase()}/storage/v1/object/${DOC_BUCKET}/${filePath(path)}`, apikey: sbPublicKey() };
+}
+export async function sbFileSignedUrl(projectId: string, taskId: string, path: string, fileName?: string) {
+  await rpc<string>("esteira_file_ticket", { p_key: appKey(), p_project_id: projectId, p_task_id: taskId, p_kind: "down", p_path: path });
+  const key = sbPublicKey();
+  const res = await fetch(`${sbBase()}/storage/v1/object/sign/${DOC_BUCKET}/${filePath(path)}`, {
+    method: "POST", cache: "no-store", headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 300 }),
+  });
+  const j = await res.json().catch(() => ({})) as { signedURL?: string; message?: string; error?: string };
+  if (!res.ok || !j.signedURL) throw new Error(`Arquivo indisponível: ${j.message || j.error || res.status}`);
   const url = `${sbBase()}/storage/v1${j.signedURL}`;
   return fileName ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(fileName)}` : url;
 }

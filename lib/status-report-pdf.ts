@@ -5,10 +5,10 @@ import type { Project, State } from "./types";
 import { LOGO_BLUE_PNG, LOGO_BLUE_RATIO } from "./brand-logo";
 import { clean, wrap } from "./escalation-pdf";
 import { PHASES, ballOf, docStates, phaseIndex, phaseOf, phaseOwner, type DocState } from "./flow";
-import { clientText, eventKind, reportEvents, type ReportOptions } from "./status-report";
+import { clientText, eventKind, reportEvents, type ProjectFile, type ReportOptions } from "./status-report";
 
-export type ReportInput = ReportOptions & { summary: string; annex: boolean; requester: string };
-export type ReportAnnex = { phase: string; label: string; doc: string; path: string; name: string; at: string };
+export type ReportInput = ReportOptions & { summary: string; annex: boolean; requester: string; files?: ProjectFile[] };
+export type ReportAnnex = { phase?: string; taskId?: string; label: string; doc: string; path: string; name: string; at: string };
 
 const C = {
   navy: rgb(0.043, 0.122, 0.2), cyan: rgb(0.063, 0.757, 0.988), teal: rgb(0.043, 0.596, 0.71), ink: rgb(0.09, 0.15, 0.22), ink2: rgb(0.27, 0.35, 0.43), ink3: rgb(0.47, 0.55, 0.62),
@@ -18,7 +18,7 @@ const C = {
 const W = 595.28, H = 841.89, M = 42, FOOT = 52;
 const fmt = (d?: string | null) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "—");
 const blank = (v?: string | null) => { const s = (v || "").trim(); return !s || s === "-" || s === "—"; };
-const LETTERS = "ABCDEFGHIJ";
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 export function reportAnnexes(p: Project): ReportAnnex[] {
   return PHASES.filter(ph => ph.doc && p.phases?.[ph.key]?.doc).map(ph => {
@@ -35,7 +35,9 @@ export async function buildStatusReportBase(s: State, p: Project, input: ReportI
   const logo = await doc.embedPng(Buffer.from(LOGO_BLUE_PNG, "base64"));
   const k = phaseOf(p), idx = phaseIndex(k), docs = docStates(p);
   const today = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  const annexes = input.annex ? reportAnnexes(p) : [];
+  const files = input.files || [];
+  const photos = files.filter(f => f.type === "image");
+  const annexes: ReportAnnex[] = [...(input.annex ? reportAnnexes(p) : []), ...files.filter(f => f.type === "pdf").map(f => ({ taskId: f.taskId, label: `Atividade: ${f.taskTitle}`, doc: "Documento da atividade", path: f.path, name: f.name, at: f.uploadedAt }))];
 
   let page!: PDFPage, y = 0;
   const text = (t: string, x: number, yy: number, size = 10, f: PDFFont = font, color: RGB = C.ink) => page.drawText(clean(t), { x, y: yy, size, font: f, color });
@@ -162,9 +164,11 @@ export async function buildStatusReportBase(s: State, p: Project, input: ReportI
   }
 
   // ---------- Índice de anexos ----------
-  if (input.annex) {
-    section("Documentos assinados anexados", annexes.length ? `${annexes.length} documento(s) a seguir` : "nenhum documento anexado até o momento");
-    annexes.forEach((a, i) => bullet(`Anexo ${LETTERS[i]} — ${a.doc} (${a.label}) · ${a.name} · anexado em ${fmt(a.at)}`, C.green));
+  if (input.annex || annexes.length || photos.length) {
+    section("Documentos e registros anexados", `${annexes.length} documento(s)${photos.length ? ` e ${photos.length} foto(s)` : ""} a seguir`);
+    if (photos.length) bullet(`Registros fotográficos: ${photos.length} foto(s) das atividades, nas páginas seguintes`, C.teal);
+    annexes.forEach((a, i) => bullet(`Anexo ${LETTERS[i] || i + 1} — ${a.doc} (${a.label}) · ${a.name} · anexado em ${fmt(a.at)}`, a.taskId ? C.blue : C.green));
+    if (!annexes.length && !photos.length) para("Nenhum documento anexado até o momento.", 9.5, font, C.ink3);
     const waived = docs.filter(d => d.state === "waived");
     waived.forEach(d => bullet(`${d.doc}: dispensado (${p.phases?.[d.key]?.docWaived?.reason || "etapa validada sem documento"})`, C.violet));
   }
@@ -175,11 +179,11 @@ export async function buildStatusReportBase(s: State, p: Project, input: ReportI
     page.drawImage(logo, { x: M, y: H - 66, width: 30 * LOGO_BLUE_RATIO, height: 30 });
     page.drawRectangle({ x: M, y: H / 2 - 70, width: W - 2 * M, height: 150, color: C.navy });
     page.drawRectangle({ x: M, y: H / 2 - 70, width: W - 2 * M, height: 4, color: C.cyan });
-    text(`ANEXO ${LETTERS[i]}`, M + 26, H / 2 + 46, 10, bold, C.cyan);
+    text(`ANEXO ${LETTERS[i] || i + 1}`, M + 26, H / 2 + 46, 10, bold, C.cyan);
     text(a.doc, M + 26, H / 2 + 14, 22, bold, C.white);
-    text(`Etapa: ${a.label}  ·  ${client}`, M + 26, H / 2 - 12, 10, font, rgb(0.75, 0.86, 0.93));
+    text(`${a.taskId ? a.label : `Etapa: ${a.label}`}  ·  ${client}`, M + 26, H / 2 - 12, 10, font, rgb(0.75, 0.86, 0.93));
     text(`Arquivo: ${a.name}  ·  anexado em ${fmt(a.at)}`, M + 26, H / 2 - 34, 9, font, rgb(0.75, 0.86, 0.93));
-    text("O documento assinado segue nas próximas páginas.", M, H / 2 - 110, 10, font, C.ink2);
+    text(a.taskId ? "O documento segue nas próximas páginas." : "O documento assinado segue nas próximas páginas.", M, H / 2 - 110, 10, font, C.ink2);
   });
   return { bytes: await doc.save(), annexes };
 }

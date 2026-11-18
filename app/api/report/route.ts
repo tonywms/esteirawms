@@ -4,17 +4,18 @@
 //  mode "send" → o servidor junta relatório + PDFs assinados, envia por e-mail e registra na linha do tempo.
 import { audit, loadState, problem, transact } from "@/lib/storage";
 import { buildStatusReportBase } from "@/lib/status-report-pdf";
-import { assembleReport } from "@/lib/status-report";
+import { assembleReport, projectFiles } from "@/lib/status-report";
+import type { ReportAnnex } from "@/lib/status-report-pdf";
 import { clean } from "@/lib/escalation-pdf";
 import { mailFrom, mailProvider, sendMail } from "@/lib/mailer";
 import { currentUser } from "@/lib/master";
-import { sbDocSignedUrl, supabaseConfigured } from "@/lib/supabase-store";
+import { sbDocSignedUrl, sbFileSignedUrl, supabaseConfigured } from "@/lib/supabase-store";
 import { PHASES, phaseIndex, phaseOf } from "@/lib/flow";
 import type { State } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type Body = { projectId?: string; mode?: "pdf" | "send"; summary?: string; kinds?: string[]; since?: string | null; exclude?: string[]; annex?: boolean; to?: string; cc?: string };
+type Body = { projectId?: string; mode?: "pdf" | "send"; summary?: string; kinds?: string[]; since?: string | null; exclude?: string[]; annex?: boolean; files?: string[]; to?: string; cc?: string };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const list = (v?: string) => [...new Set((v || "").split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(Boolean))];
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -30,14 +31,20 @@ export async function POST(req: Request) {
   const client = s.clients.find(c => c.id === p.clientId)?.name || p.name;
   const who = await currentUser();
   const annex = b.annex !== false && supabaseConfigured();
-  const input = { summary: (b.summary || "").trim(), kinds: b.kinds, since: b.since || null, exclude: b.exclude, annex, requester: who.name };
+  const chosen = new Set(b.files || []);
+  const files = supabaseConfigured() ? projectFiles(p, s.tasks).filter(f => chosen.has(f.id)) : [];
+  const photoFiles = files.filter(f => f.type === "image");
+  const input = { summary: (b.summary || "").trim(), kinds: b.kinds, since: b.since || null, exclude: b.exclude, annex, requester: who.name, files };
+  const urlOf = (a: ReportAnnex) => (a.taskId ? sbFileSignedUrl(p.id, a.taskId, a.path) : sbDocSignedUrl(p.id, a.phase || "", a.path));
+  const captions = photoFiles.map(f => `${f.taskTitle} · ${new Date(f.uploadedAt).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} · ${f.name}`);
   const { bytes, annexes } = await buildStatusReportBase(s, p, input);
   const footer = clean(`WMS Expert · Status report · ${client} · emitido em ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`);
   const filename = `status-report-${slug(client)}-${new Date().toISOString().slice(0, 10)}.pdf`;
 
   if (b.mode !== "send") {
-    const links = await Promise.all(annexes.map(a => sbDocSignedUrl(p.id, a.phase, a.path).catch(() => null)));
-    return Response.json({ pdf: Buffer.from(bytes).toString("base64"), annexes: links, footer, filename });
+    const links = await Promise.all(annexes.map(a => urlOf(a).catch(() => null)));
+    const photos = await Promise.all(photoFiles.map((f, i) => sbFileSignedUrl(p.id, f.taskId, f.path).then(url => ({ url, caption: clean(captions[i]) })).catch(() => ({ url: null, caption: clean(captions[i]) }))));
+    return Response.json({ pdf: Buffer.from(bytes).toString("base64"), annexes: links, photos, footer, filename });
   }
 
   const to = list(b.to), cc = list(b.cc);
@@ -46,10 +53,11 @@ export async function POST(req: Request) {
   if (bad.length) return problem(`E-mail inválido: ${bad.join(", ")}`);
   if (to.length + cc.length > 15) return problem("Máximo de 15 destinatários por envio.");
   if (!mailProvider()) return problem("O envio de e-mail ainda não foi configurado. Baixe o PDF e envie manualmente.");
-  const files = await Promise.all(annexes.map(async a => {
-    try { const url = await sbDocSignedUrl(p.id, a.phase, a.path); const r = await fetch(url, { cache: "no-store" }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; } catch { return null; }
+  const annexFiles = await Promise.all(annexes.map(async a => {
+    try { const url = await urlOf(a); const r = await fetch(url, { cache: "no-store" }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; } catch { return null; }
   }));
-  const pdf = Buffer.from(await assembleReport(bytes, annexes.length, files, footer));
+  const photoBytes = await Promise.all(photoFiles.map(async (f, i) => { try { const r = await fetch(await sbFileSignedUrl(p.id, f.taskId, f.path), { cache: "no-store" }); return { bytes: r.ok ? new Uint8Array(await r.arrayBuffer()) : null, caption: clean(captions[i]) }; } catch { return { bytes: null, caption: clean(captions[i]) }; } }));
+  const pdf = Buffer.from(await assembleReport(bytes, annexes.length, annexFiles, footer, photoBytes));
   if (pdf.length > MAX_MAIL) return problem(`O relatório com os anexos ficou com ${(pdf.length / 1048576).toFixed(1)} MB, acima do limite de e-mail. Desmarque "Anexar PDFs assinados" ou envie o link do download.`);
 
   const k = phaseOf(p), stage = PHASES[phaseIndex(k)].label;
@@ -62,7 +70,7 @@ export async function POST(req: Request) {
 <div style="color:#fff;font-size:26px;font-weight:800;margin-top:6px">${esc(client)}</div>
 <div style="color:#bfdbee;font-size:13px;margin-top:6px">${esc(p.system)} · Etapa atual: ${esc(stage)}</div></td></tr>
 ${input.summary ? `<tr><td style="padding:24px 28px 4px"><div style="padding:14px 16px;background:#f4f8fb;border-left:4px solid #10c1fc;border-radius:10px;color:#13263a;font-size:14.5px;line-height:1.55;white-space:pre-wrap">${esc(input.summary)}</div></td></tr>` : ""}
-<tr><td style="padding:20px 28px 26px;color:#46596b;font-size:13.5px;line-height:1.55">Segue em anexo o status report com o andamento por etapa, os próximos passos, o histórico do projeto${annexes.length ? ` e os ${annexes.length} documento(s) assinado(s)` : ""}.<br><br>Qualquer dúvida, basta responder este e-mail.<br><br><b>${esc(who.name)}</b><br>WMS Expert</td></tr>
+<tr><td style="padding:20px 28px 26px;color:#46596b;font-size:13.5px;line-height:1.55">Segue em anexo o status report com o andamento por etapa, os próximos passos, o histórico do projeto${annexes.length ? ` e os ${annexes.length} documento(s) anexado(s)` : ""}${photoFiles.length ? `, com ${photoFiles.length} registro(s) fotográfico(s)` : ""}.<br><br>Qualquer dúvida, basta responder este e-mail.<br><br><b>${esc(who.name)}</b><br>WMS Expert</td></tr>
 </table></td></tr></table></body></html>`;
   try {
     await sendMail({ to, cc: cc.length ? cc : undefined, replyTo: who.email || undefined, subject: `Status report · ${client} · ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`, html, text: `Status report - ${client}\n\n${input.summary}\n\nRelatório completo em anexo.\n\n${who.name}\nWMS Expert`, attachments: [{ filename, content: pdf, contentType: "application/pdf" }] });
@@ -71,7 +79,7 @@ ${input.summary ? `<tr><td style="padding:24px 28px 4px"><div style="padding:14p
   const now = new Date().toISOString();
   await transact((st: State) => {
     const pp = st.projects.find(x => x.id === p.id); if (!pp) return;
-    const text = `Status report enviado ao cliente (${to.join(", ")}${cc.length ? `; cópia: ${cc.join(", ")}` : ""}) com ${annexes.length} documento(s) assinado(s) anexado(s)`;
+    const text = `Status report enviado ao cliente (${to.join(", ")}${cc.length ? `; cópia: ${cc.join(", ")}` : ""}) com ${annexes.length} documento(s)${photoFiles.length ? ` e ${photoFiles.length} foto(s)` : ""} anexado(s)`;
     pp.timeline = [{ id: crypto.randomUUID(), at: now, kind: "report", author: who.name, text }, ...(pp.timeline || [])];
     pp.updatedAt = now;
     audit(st, "projects", "status report enviado", pp.id, `${client} -> ${to.join(", ")}`);

@@ -11,6 +11,7 @@ function apiAllowed(p: Profile, path: string, method: string): string | null {
   if (path.startsWith("/api/import")) return canImport(p) ? null : "Somente Administradores e Gestores podem importar a base.";
   if (path.startsWith("/api/docs/upload")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode anexar documentos.`;
   if (path.startsWith("/api/docs/view")) return p === "Painel" ? "Perfil Painel: somente a TV." : null;
+  if (path.startsWith("/api/tasks/attachments")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "tasks", "PATCH") ? null : `Seu perfil (${p}) não pode anexar arquivos.`;
   if (path.startsWith("/api/flow/override") || path.startsWith("/api/escalate") || path.startsWith("/api/report")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode executar esta ação.`;
   if (read) return null;
   const m = path.match(/^\/api\/records\/([^/]+)/);

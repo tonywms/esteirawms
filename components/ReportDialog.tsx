@@ -3,9 +3,9 @@
 // PDFs assinados como anexos, baixar ou enviar por e-mail (fica registrado na linha do tempo).
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CheckSquare2, Download, FileText, Info, Paperclip, RefreshCw, Send, Square, X } from "lucide-react";
+import { Camera, CheckSquare2, Download, FileText, Info, Paperclip, RefreshCw, Send, Square, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
-import { DEFAULT_REPORT_KINDS, REPORT_KINDS, clientText, reportEvents } from "@/lib/status-report";
+import { DEFAULT_REPORT_KINDS, REPORT_KINDS, clientText, projectFiles, reportEvents } from "@/lib/status-report";
 import { PHASES } from "@/lib/flow";
 
 export default function ReportDialog({ data, project, client, onClose, onDone }: { data: State; project: Project; client: string; onClose: () => void; onDone: (msg: string) => void | Promise<void> }) {
@@ -17,13 +17,15 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
   const events = useMemo(() => reportEvents(project, { kinds, since: since || null }), [project, kinds, since]);
   const included = events.filter(e => !exclude.includes(e.id));
   const signed = PHASES.filter(ph => ph.doc && project.phases?.[ph.key]?.doc);
+  const allFiles = useMemo(() => projectFiles(project, data.tasks), [project, data.tasks]);
+  const [files, setFiles] = useState<string[]>(() => projectFiles(project, data.tasks).map(f => f.id));
   useEffect(() => {
     setMounted(true); fetch("/api/escalate", { cache: "no-store" }).then(r => r.json()).then(setMail).catch(() => setMail({ configured: false, from: null }));
     const t = window.setTimeout(() => ref.current?.focus(), 40);
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", esc); return () => { window.clearTimeout(t); window.removeEventListener("keydown", esc); };
   }, [onClose]);
-  const payload = (mode: "pdf" | "send") => JSON.stringify({ projectId: project.id, mode, summary, kinds, since: since || null, exclude, annex, to, cc });
+  const payload = (mode: "pdf" | "send") => JSON.stringify({ projectId: project.id, mode, summary, kinds, since: since || null, exclude, annex, files, to, cc });
 
   async function download() {
     setBusy("pdf"); setError("");
@@ -33,9 +35,10 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Falha ao gerar o relatório.");
       const base = Uint8Array.from(atob(j.pdf), c => c.charCodeAt(0));
-      const files = await Promise.all((j.annexes as (string | null)[]).map(async u => { if (!u) return null; try { const x = await fetch(u); return x.ok ? new Uint8Array(await x.arrayBuffer()) : null; } catch { return null; } }));
+      const annexBytes = await Promise.all((j.annexes as (string | null)[]).map(async u => { if (!u) return null; try { const x = await fetch(u); return x.ok ? new Uint8Array(await x.arrayBuffer()) : null; } catch { return null; } }));
+      const photos = await Promise.all((j.photos as { url: string | null; caption: string }[]).map(async ph => { if (!ph.url) return { bytes: null, caption: ph.caption }; try { const x = await fetch(ph.url); return { bytes: x.ok ? new Uint8Array(await x.arrayBuffer()) : null, caption: ph.caption }; } catch { return { bytes: null, caption: ph.caption }; } }));
       const { assembleReport } = await import("@/lib/status-report");
-      const out = await assembleReport(base, files.length, files, j.footer);
+      const out = await assembleReport(base, annexBytes.length, annexBytes, j.footer, photos);
       const url = URL.createObjectURL(new Blob([out as BlobPart], { type: "application/pdf" }));
       if (w) w.location.href = url; else { const a = document.createElement("a"); a.href = url; a.download = j.filename; a.click(); }
       window.setTimeout(() => URL.revokeObjectURL(url), 120000);
@@ -59,7 +62,7 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
         <button type="button" className="p6-confirm-x" onClick={onClose} disabled={!!busy} aria-label="Fechar"><X size={17} /></button>
         <header className="v9-esc-head">
           <span className="v9-esc-ico"><FileText size={24} /></span>
-          <div><small>Status report para o cliente</small><h2 id="v11-rep-title">{client}</h2><p><Paperclip size={13} /> {signed.length} documento(s) assinado(s) · {included.length} registro(s) no histórico</p></div>
+          <div><small>Status report para o cliente</small><h2 id="v11-rep-title">{client}</h2><p><Paperclip size={13} /> {signed.length} documento(s) assinado(s) · {allFiles.length} anexo(s) de atividades · {included.length} registro(s) no histórico</p></div>
         </header>
         <div className="v9-esc-body">
           <label className="v9-field"><span>Mensagem ao cliente (abre o relatório e o e-mail)</span>
@@ -72,6 +75,8 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
             <div className="v9-field"><span>Documentos assinados</span>
               <button type="button" className={`v11-toggle ${annex ? "on" : ""}`} onClick={() => setAnnex(v => !v)} disabled={!!busy}>{annex ? <CheckSquare2 size={16} /> : <Square size={16} />} Anexar PDFs assinados ({signed.length})</button></div>
           </div>
+          {allFiles.length > 0 && <div className="v9-field"><span>Fotos e PDFs das atividades ({files.length} de {allFiles.length}) — fotos entram no relatório, PDFs vão como anexo</span>
+            <div className="v11-events v12-files">{allFiles.map(f => { const on = files.includes(f.id); return <button type="button" key={f.id} className={on ? "on" : ""} disabled={!!busy} onClick={() => setFiles(x => (on ? x.filter(i => i !== f.id) : [...x, f.id]))}>{on ? <CheckSquare2 size={15} /> : <Square size={15} />}<time>{f.type === "image" ? <><Camera size={12} /> foto</> : <><FileText size={12} /> PDF</>}</time><span>{f.taskTitle} · {f.name}</span></button>; })}</div></div>}
           <div className="v9-field"><span>Revisar registros ({included.length} de {events.length}) <button type="button" className="v11-link" onClick={() => setReview(v => !v)}>{review ? "ocultar" : "revisar item a item"}</button></span>
             {review && <div className="v11-events">{events.map(e => { const on = !exclude.includes(e.id); return <button type="button" key={e.id} className={on ? "on" : ""} onClick={() => setExclude(x => (on ? [...x, e.id] : x.filter(i => i !== e.id)))}>{on ? <CheckSquare2 size={15} /> : <Square size={15} />}<time>{new Date(e.at).toLocaleDateString("pt-BR")}</time><span>{clientText(e.text)}</span></button>; })}
               {!events.length && <div className="v9-empty"><Info size={15} /> Nenhum registro com os filtros escolhidos.</div>}</div>}</div>
