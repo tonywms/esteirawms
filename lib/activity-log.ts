@@ -45,6 +45,12 @@ export function logTask(state: State, before: Task | null, after: Task | null, a
   if ((before.owner || "") !== (after.owner || "")) parts.push(`responsável ${before.owner || "—"} → ${after.owner || "—"}`);
   if ((before.blocker || "").trim() !== (after.blocker || "").trim()) parts.push(blank(after.blocker) ? "empecilho resolvido" : `empecilho: ${after.blocker}`);
   if ((before.title || "") !== (after.title || "")) parts.push(`renomeada (antes: “${before.title}”)`);
+  const n0 = (before.notes || "").trim(), n1 = (after.notes || "").trim();
+  if (n0 !== n1 && n1) {
+    const added = n0 && n1.startsWith(n0) ? n1.slice(n0.length).trim() : "";
+    const cut = (t: string) => (t.length > 400 ? `${t.slice(0, 400)}…` : t);
+    parts.push(added ? `observação: “${cut(added)}”` : `observações: “${cut(n1)}”`);
+  }
   push(state, after.projectId, ref, "atividade", parts, `Atividade ${name}: `, author);
 }
 
