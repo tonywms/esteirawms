@@ -15,7 +15,7 @@ const call = attachCall;
 export default function TaskAttachments({ taskId, initial }: { taskId: string; initial?: TaskAttachment[] }) {
   const [items, setItems] = useState<TaskAttachment[]>(initial || []), [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(""), [pct, setPct] = useState(0), [msg, setMsg] = useState(""), [err, setErr] = useState(false), [confirm, setConfirm] = useState<ConfirmBox | null>(null), [signAtt, setSignAtt] = useState<TaskAttachment | null>(null);
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLInputElement>(null), cam = useRef<HTMLInputElement>(null);
   const [queue, setQueue] = useState<File[]>(() => { if (!taskId) setPending([]); return []; });
   const setQueueFiles = (files: File[]) => { setQueue(files); setPending(files); };
   const [previews, setPreviews] = useState<string[]>([]);
@@ -68,8 +68,10 @@ export default function TaskAttachments({ taskId, initial }: { taskId: string; i
         <div className="v12-att-act"><button type="button" className="danger" onClick={() => setQueueFiles(queue.filter((_, j) => j !== i))} title="Tirar da lista"><X size={14} /></button></div>
       </div>)}
       <button type="button" className="v12-add" onClick={() => input.current?.click()}><ImagePlus size={20} /><span>Anexar foto ou PDF</span></button>
+      <button type="button" className="v12-add v16-cam" onClick={() => cam.current?.click()}><Camera size={20} /><span>Tirar foto</span></button>
     </div>
     <input ref={input} type="file" accept="image/*,application/pdf,.pdf" multiple hidden onChange={e => { const ok: File[] = []; for (const f of Array.from(e.target.files || [])) { const bad = checkFile(f); if (bad) flash(bad, true); else ok.push(f); } setQueueFiles([...queue, ...ok].slice(0, 15)); if (input.current) input.current.value = ""; }} />
+    <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={e => { const f = e.target.files?.[0]; if (f) setQueueFiles([...queue, f].slice(0, 15)); if (cam.current) cam.current.value = ""; }} />
     {msg && <div className={`v12-att-msg ${err ? "err" : ""}`}>{msg}</div>}
   </div>;
   return <div className="v12-att span2">
@@ -85,8 +87,10 @@ export default function TaskAttachments({ taskId, initial }: { taskId: string; i
         <div className="v12-att-act"><button type="button" onClick={() => void view(a)} title="Abrir"><Eye size={14} /></button><button type="button" className="danger" onClick={() => remove(a)} title="Remover"><Trash2 size={14} /></button></div>
       </div>)}
       <button type="button" className="v12-add" onClick={() => input.current?.click()} disabled={!!busy}>{busy ? <><RefreshCw className="spin" size={18} /><span>{pct}%</span></> : <><ImagePlus size={20} /><span>Anexar foto ou PDF</span></>}</button>
+      <button type="button" className="v12-add v16-cam" onClick={() => cam.current?.click()} disabled={!!busy}><Camera size={20} /><span>Tirar foto</span></button>
     </div>
     <input ref={input} type="file" accept="image/*,application/pdf,.pdf" multiple hidden onChange={e => void upload(e.target.files)} />
+    <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={e => { void upload(e.target.files); if (cam.current) cam.current.value = ""; }} />
     {msg && <div className={`v12-att-msg ${err ? "err" : ""}`}>{msg}</div>}
     {confirm && <ConfirmDialog box={confirm} onClose={() => setConfirm(null)} />}
     {signAtt && <SignDialog target={{ kind: "task", taskId, attachment: signAtt }} onClose={() => setSignAtt(null)} onDone={async msg => { await reload(); flash(msg); }} />}
