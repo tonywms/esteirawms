@@ -1,11 +1,11 @@
 // V9 · Usuário master: libera fase sem PDF, encerra ou cancela projetos.
-// Quem é master: ESTEIRA_MASTERS (e-mails separados por vírgula). Padrão: tonikq24@gmail.com.
+// Quem é master: ESTEIRA_MASTERS (e-mails separados por vírgula). Padrão: tonymoreira@wmsexpert.com.br.
 // A liberação sempre exige e-mail + senha do master (conferidos no Supabase, senha em bcrypt).
 import { cookies } from "next/headers";
 import { COOKIE, readSession } from "./auth";
 import { sbAuth, supabaseConfigured } from "./supabase-store";
 
-export const masterEmails = () => (process.env.ESTEIRA_MASTERS || "tonikq24@gmail.com").split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+export const masterEmails = () => (process.env.ESTEIRA_MASTERS || "tonymoreira@wmsexpert.com.br").split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(Boolean);
 export const isMasterEmail = (email?: string | null) => !!email && masterEmails().includes(email.trim().toLowerCase());
 
 const tries = new Map<string, { n: number; at: number }>();
