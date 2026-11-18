@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, Copy, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, GitBranch, Hand, ListChecks, MessageSquare, MessageSquarePlus, PenLine, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
-import { BALL, PHASES, ballOf, canMove, docOf, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
+import { BALL, PHASES, ballOf, canMove, docOf, docResolved, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
 import type { PhaseDoc } from "@/lib/types";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import MasterDialog, { type MasterBox } from "./MasterDialog";
@@ -41,14 +41,16 @@ function DocIcon({ s, size = 13 }: { s: DocState; size?: number }) {
 }
 const fmtSize = (n?: number) => !n ? "" : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 
+/** V15 · projeto parado porque falta o PDF da fase atual (não pode avançar). */
+const stuckByDoc = (p: Project) => { const k = phaseOf(p), ph = PHASES[phaseIndex(k)]; return k !== "fim" && !!ph.doc && !docResolved(p, k); };
 function Dot({ h }: { h: Health }) { return <span className={`v7-dot v7-${h}`} aria-label={healthLabel[h]} />; }
 
 export default function FlowBoard({ data, onRefresh, onEdit, onOpen }: Props) {
-  const [wave, setWave] = useState(""), [health, setHealth] = useState<"" | Health>(""), [q, setQ] = useState("");
+  const [wave, setWave] = useState(""), [health, setHealth] = useState<"" | Health>(""), [q, setQ] = useState(""), [onlyStuck, setOnlyStuck] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const sum = useMemo(() => flowSummary(data), [data]);
   const visible = sum.reports.filter(r =>
-    (!wave || laneOf(r.p) === wave) && (!health || r.h.health === health) &&
+    (!wave || laneOf(r.p) === wave) && (!health || r.h.health === health) && (!onlyStuck || stuckByDoc(r.p)) &&
     (!q || `${clientName(data, r.p.clientId)} ${r.p.name} ${phaseOwner(r.p)} ${r.p.blocker} ${ballOf(r.p)}`.toLowerCase().includes(q.toLowerCase())));
   const lanes = (wave ? [wave] : LANES).filter(l => visible.some(r => laneOf(r.p) === l) || !wave);
   const project = selected ? data.projects.find(p => p.id === selected) || null : null;
@@ -77,6 +79,7 @@ export default function FlowBoard({ data, onRefresh, onEdit, onOpen }: Props) {
     <div className="v7-toolbar">
       <div className="v7-chips">{["", ...LANES].map(w => <button key={w || "all"} className={wave === w ? "on" : ""} onClick={() => setWave(w)}>{w || "Todas as ondas"}</button>)}</div>
       <label className="searchfield v7-search"><Search size={16} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Cliente, dono, empecilho..." />{q && <button onClick={() => setQ("")} aria-label="Limpar"><X size={14} /></button>}</label>
+      <button type="button" className={`v15-stuck ${onlyStuck ? "on" : ""}`} onClick={() => setOnlyStuck(v => !v)} title="Mostrar só os projetos que não podem avançar por falta do PDF da fase"><FileX2 size={14} /> Trava avanço <em>{sum.reports.filter(r => stuckByDoc(r.p)).length}</em></button>
       <div className="v7-legend"><span><Dot h="red" /> Crítico</span><span><Dot h="amber" /> Atenção</span><span><Dot h="green" /> No fluxo</span></div>
     </div>
 
@@ -110,7 +113,8 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
             <span className={`v7-ball-chip b-${ballOf(p).split(" ")[0].toLowerCase()}`} title="Com quem está a bola"><Hand size={11} />{ballOf(p)}</span>
           </div>
           <div className="v7-docs" aria-label="Documentos da esteira">{docStates(p).map(d => <span key={d.key} className={`v7-doc s-${d.state}`} title={`${d.label} · ${d.doc}: ${DOC_STATE_LABEL[d.state]}`}><DocIcon s={d.state} /><b>{d.letter}</b></span>)}</div>
-          {h.health !== "done" && (p.nextAction ? <div className="v7-card-next"><Target size={12} />{p.nextAction}</div> : (p.blocker && p.blocker !== "-" ? <div className="v7-card-block"><AlertTriangle size={12} />{p.blocker}</div> : <div className="v7-card-warn">Definir próxima ação</div>))}
+          {h.health === "red" || h.health === "amber" ? <div className={h.health === "red" ? "v7-card-block" : "v7-card-warn"}><AlertTriangle size={12} />{h.reasons[0]}{h.reasons.length > 1 && <i className="v15-more">+{h.reasons.length - 1}</i>}</div>
+            : h.health !== "done" && p.nextAction ? <div className="v7-card-next"><Target size={12} />{p.nextAction}</div> : null}
         </button>)}
     </div>)}
   </>;
