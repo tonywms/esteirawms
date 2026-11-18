@@ -11,7 +11,8 @@ import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import Select from "./Select"; /* WMS_ESTEIRA_V7_8 */
 import { canSeePath, canWriteEntity, homeFor, type Profile } from "@/lib/permissions"; /* WMS_ESTEIRA_V7_6 */ /* WMS_ESTEIRA_V7_5 */
 import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOwner,summary,todayISO,weeklySlots,weekStart} from "@/lib/metrics";
-import TaskAttachments from "./TaskAttachments"; /* WMS_ESTEIRA_V12 */
+import TaskAttachments from "./TaskAttachments";
+import { flushTaskUploads } from "@/lib/task-uploads"; /* WMS_ESTEIRA_V12_1 */ /* WMS_ESTEIRA_V12 */
 
 type ModalMode={entity:EntityName;id?:string};
 /* WMS_ESTEIRA_V6_1 */
@@ -124,10 +125,10 @@ export default function ControlTower(){
    if(modal.entity==="appointments"&&!String(form.title||"").trim())throw new Error("Informe a atividade / objetivo do agendamento.");
    const until=modal.entity==="appointments"&&!modal.id&&form.untilDate&&String(form.untilDate)>String(form.date)?String(form.untilDate):"";
    const days:(string|null)[]=[];if(until){const d=new Date(String(form.date)+"T12:00:00");while(asLocalDate(d)<=until){if(d.getDay()!==0&&d.getDay()!==6)days.push(asLocalDate(d));d.setDate(d.getDate()+1)}}else days.push(null);
-   let created=0;const failed:string[]=[];
-   for(const day of days){const body:Record<string,unknown>={...form,...(day?{date:day}:{})};delete body.untilDate;const res=await fetch(url,{method:modal.id?"PATCH":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const json=await res.json();if(!res.ok){if(days.length===1)throw new Error(json.error||"Falha ao salvar");failed.push(`${fmtDate(day)}: ${json.error||"falha"}`)}else created++}
+   let created=0;const failed:string[]=[];let upMsg="";
+   for(const day of days){const body:Record<string,unknown>={...form,...(day?{date:day}:{})};delete body.untilDate;const res=await fetch(url,{method:modal.id?"PATCH":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const json=await res.json();if(!res.ok){if(days.length===1)throw new Error(json.error||"Falha ao salvar");failed.push(`${fmtDate(day)}: ${json.error||"falha"}`)}else{created++;if(modal.entity==="tasks"&&!modal.id&&json?.id){const up=await flushTaskUploads(String(json.id));if(up.sent)upMsg+=` · ${up.sent} anexo(s) enviado(s)`;if(up.failed.length)upMsg+=` · falha em ${up.failed.length} anexo(s): ${up.failed.join(" · ")}`}}}
    if(days.length>1&&!created)throw new Error(failed.join(" · "));
-   setModal(null);await refresh();notify(days.length>1?`${created} dia(s) agendado(s)${failed.length?` · ${failed.length} não agendado(s) por conflito: ${failed.join(" · ")}`:""}`:modal.id?"Registro atualizado com sucesso":"Registro cadastrado com sucesso")}
+   setModal(null);await refresh();notify(days.length>1?`${created} dia(s) agendado(s)${failed.length?` · ${failed.length} não agendado(s) por conflito: ${failed.join(" · ")}`:""}`:modal.id?"Registro atualizado com sucesso":"Registro cadastrado com sucesso"+upMsg)}
   catch(e){const m=e instanceof Error?e.message:"Falha ao salvar";setFormError(m);notify(`Atenção: ${m}`)}finally{setSaving(false)}
  }
  /* WMS_ESTEIRA_V7_4 */

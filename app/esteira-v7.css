@@ -630,3 +630,6 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v12-att-msg.err { color: #c22f49; }
 .v12-files time { display: inline-flex; align-items: center; gap: 4px; }
 .form-grid > .v12-att.span2, .modal-backdrop .p6-modal .v12-att.span2 { grid-column: 1 / -1; }
+.v12-att-item.pending { border-style: dashed; border-color: #9fd6e8; }
+.v12-att-item.pending .v12-att-meta small { display: inline-flex; align-items: center; gap: 4px; color: #0a8db0; font-weight: 700; }
+.v12-att-item.pending .v12-thumb { cursor: default; }
