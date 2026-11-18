@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 function emailHtml(s: State, p: Project, client: string, b: Required<Pick<Body, "message" | "urgency">>, who: { name: string; email: string }, origin: string) {
-  const h = healthOf(p), c = h.health === "red" ? "#e0475f" : h.health === "amber" ? "#d98c12" : "#0f9a68";
+  const h = healthOf(p, undefined, s.tasks), c = h.health === "red" ? "#e0475f" : h.health === "amber" ? "#d98c12" : "#0f9a68";
   const blocker = (p.blocker || "").trim() && p.blocker !== "-" ? p.blocker : "Não informado";
   const row = (l: string, v: string) => `<tr><td style="padding:9px 0;border-bottom:1px solid #e6edf2;color:#6b7d8c;font-size:12px;font-weight:700;width:170px;vertical-align:top">${esc(l)}</td><td style="padding:9px 0;border-bottom:1px solid #e6edf2;color:#13263a;font-size:13.5px">${esc(v)}</td></tr>`;
   return `<!doctype html><html><body style="margin:0;background:#eef3f7;font-family:Segoe UI,Helvetica,Arial,sans-serif">

@@ -113,7 +113,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
 }
 
 function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: State; p: Project; onClose: () => void; onRefresh: Props["onRefresh"]; onEdit: Props["onEdit"]; onOpen: Props["onOpen"] }) {
-  const k = phaseOf(p), h = healthOf(p), idx = phaseIndex(k);
+  const k = phaseOf(p), h = healthOf(p, undefined, data.tasks), idx = phaseIndex(k);
   const nextOptions: PhaseKey[] = idx >= PHASES.length - 1 ? [] : k === "homolog" ? ["campo", "golive"] : [PHASES[idx + 1].key];
   const [next, setNext] = useState({ nextAction: p.nextAction || "", nextActionOwner: p.nextActionOwner || "", nextActionDue: p.nextActionDue || "" });
   const [blocker, setBlocker] = useState(p.blocker && p.blocker !== "-" ? p.blocker : "");

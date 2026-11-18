@@ -1,6 +1,6 @@
 // V7 · Esteira por fases: começo, meio e fim de cada projeto, com dono por fase,
 // semáforo automático e "com quem está a bola". Tudo calculado, sem preenchimento extra.
-import type { Project, State, PhaseInfo } from "./types";
+import type { Project, State, PhaseInfo, Task } from "./types";
 import { isBlocked, isDone, todayISO } from "./metrics";
 
 // V8 · Ordem oficial: Kickoff/Treinamento > Dev & Integração > Homologação > Implantação (opcional) > Go-live > Encerrado.
@@ -67,7 +67,18 @@ export type Health = "green" | "amber" | "red" | "done";
 export type HealthReport = { health: Health; reasons: string[]; idle: number | null; inPhase: number | null; due: string | null };
 
 /** Semáforo automático. */
-export function healthOf(p: Project, today = todayISO()): HealthReport {
+/** V10.2 · Atividades abertas do projeto que pesam no semáforo (vencidas, com empecilho, sem prazo). */
+export function taskSignals(p: Project, tasks: Task[] = [], today = todayISO()) {
+  const open = tasks.filter(t => t.projectId === p.id && !isDone(t.status) && !norm(t.status).includes("cancel"));
+  const blankTxt = (v?: string) => { const x = (v || "").trim(); return !x || x === "-" || x === "—"; };
+  const overdue = open.filter(t => t.dueDate && t.dueDate < today).sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+  const blocked = open.filter(t => !blankTxt(t.blocker));
+  const noDue = open.filter(t => !t.dueDate);
+  return { open, overdue, blocked, noDue };
+}
+const short = (t: string, n = 48) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
+export function healthOf(p: Project, today = todayISO(), tasks?: Task[]): HealthReport {
   const k = phaseOf(p);
   const idle = daysBetween(lastTouch(p), today);
   const inPhase = daysBetween(phaseSince(p, k), today);
@@ -77,10 +88,15 @@ export function healthOf(p: Project, today = todayISO()): HealthReport {
   const blocker = (p.blocker || "").trim();
   if (isBlocked(p.status)) red.push("Status travado / em ajustes");
   if (blocker && blocker !== "-") red.push(`Empecilho: ${blocker}`);
+  const ts = taskSignals(p, tasks, today);
+  const tb = ts.blocked.filter(t => norm(t.blocker).trim() !== norm(blocker).trim()); // não repete o empecilho do projeto
+  if (tb.length) red.push(tb.length === 1 ? `Empecilho na atividade “${short(tb[0].title)}”: ${short(tb[0].blocker, 60)}` : `${tb.length} atividades com empecilho (ex.: ${short(tb[0].blocker, 50)})`);
   if (due && due < today) red.push(`Prazo da fase vencido em ${due.split("-").reverse().join("/")}`);
+  if (ts.overdue.length) red.push(ts.overdue.length === 1 ? `Atividade vencida em ${String(ts.overdue[0].dueDate).split("-").reverse().join("/")}: “${short(ts.overdue[0].title)}”` : `${ts.overdue.length} atividades vencidas (mais antiga: ${String(ts.overdue[0].dueDate).split("-").reverse().join("/")})`);
   if (idle !== null && idle >= 7) red.push(`Sem movimentação há ${idle} dias`);
   else if (idle !== null && idle >= 3) amber.push(`Parado há ${idle} dias`);
   if (due && due >= today && (daysBetween(today, due) ?? 99) <= 2) amber.push("Prazo da fase vence em até 2 dias");
+  if (ts.noDue.length) amber.push(ts.noDue.length === 1 ? `Atividade sem prazo: “${short(ts.noDue[0].title)}”` : `${ts.noDue.length} atividades sem prazo`);
   if (!(p.nextAction || "").trim()) amber.push("Sem próxima ação definida");
   const missingDocs = docStates(p).filter(d => d.state === "missing");
   if (missingDocs.length) amber.push(`Documentação pendente: ${missingDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
@@ -103,7 +119,7 @@ export function isArchived(p: Project, today = todayISO()) {
 
 export function flowSummary(s: State) {
   const active = s.projects.filter(p => !isArchived(p));
-  const reports = active.map(p => ({ p, phase: phaseOf(p), h: healthOf(p) }));
+  const reports = active.map(p => ({ p, phase: phaseOf(p), h: healthOf(p, todayISO(), s.tasks) }));
   const byPhase = PHASES.map(ph => ({ ...ph, items: reports.filter(r => r.phase === ph.key) }));
   const count = (h: Health) => reports.filter(r => r.h.health === h).length;
   const ball = BALL.map(b => ({ name: b, count: reports.filter(r => r.h.health !== "done" && ballOf(r.p) === b).length }));

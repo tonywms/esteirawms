@@ -45,7 +45,7 @@ export async function buildEscalationPdf(s: State, p: Project, input: Escalation
   doc.setTitle(`Escalonamento - ${client}`); doc.setAuthor("WMS Expert"); doc.setSubject("Histórico do projeto e entrave atual"); doc.setCreator("Esteira de Entregas WMS Expert");
   const font = await doc.embedFont(StandardFonts.Helvetica), bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = await doc.embedPng(Buffer.from(LOGO_BLUE_PNG, "base64"));
-  const h = healthOf(p), k = phaseOf(p), idx = phaseIndex(k), docs = docStates(p);
+  const h = healthOf(p, undefined, s.tasks), k = phaseOf(p), idx = phaseIndex(k), docs = docStates(p);
   const generated = fmtDT(new Date().toISOString());
 
   let page!: PDFPage, y = 0;
