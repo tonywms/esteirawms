@@ -174,14 +174,14 @@ export async function buildEscalationPdf(s: State, p: Project, input: Escalation
   }
 
   // ---------- Linha do tempo ----------
-  const tl = [...(p.timeline || [])].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 60);
+  const tl = [...(p.timeline || [])].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 400);
   section("Histórico do projeto", `${tl.length} registro(s), do mais recente ao mais antigo`);
   if (!tl.length) para("Sem registros na linha do tempo.", 9.5, font, C.ink3);
   for (const e of tl) {
     const lines = wrap(e.text, font, 9.2, W - 2 * M - 128);
     need(lines.length * 12.5 + 10);
     const top = y;
-    page.drawCircle({ x: M + 4, y: top + 3, size: 2.6, color: e.kind === "master" ? C.violet : e.kind === "escalonamento" ? C.red : e.kind === "doc" ? C.green : C.cyan });
+    page.drawCircle({ x: M + 4, y: top + 3, size: 2.6, color: e.kind === "master" ? C.violet : e.kind === "escalonamento" ? C.red : e.kind === "doc" ? C.green : e.kind === "atividade" ? rgb(0.18, 0.49, 0.88) : e.kind === "agenda" ? C.teal : e.kind === "fase" ? C.navy : C.grey });
     text(fmtDT(e.at), M + 14, top, 8.2, bold, C.ink2);
     if (e.author) text(wrap(e.author, font, 7.5, 100)[0], M + 14, top - 10, 7.5, font, C.ink3);
     lines.forEach((l, i) => text(l, M + 128, top - i * 12.5, 9.2, font, C.ink));

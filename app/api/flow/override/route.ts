@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         p.status = "Cancelado"; p.archivedAt = now; p.wave = p.wave === "Concluído" ? p.wave : "Congelado";
         text = `Liberação master (${m.name}): projeto CANCELADO e retirado da esteira e do painel. Motivo: ${reason}${by}`;
       }
-      p.timeline = [{ id: crypto.randomUUID(), at: now, kind: "master", author: m.name, text }, ...(p.timeline || [])].slice(0, 200);
+      p.timeline = [{ id: crypto.randomUUID(), at: now, kind: "master", author: m.name, text }, ...(p.timeline || [])];
       p.lastMovement = now.slice(0, 10); p.updatedAt = now;
       const client = s.clients.find(c => c.id === p.clientId)?.name || p.name;
       audit(s, "projects", `liberação master (${b.action})`, p.id, `${client} · ${m.email}`);

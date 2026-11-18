@@ -554,3 +554,21 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v9-staff-mail span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v9-staff-mail b { color: var(--p6-ink-2); margin-right: 6px; }
 @media (max-width: 640px) { .v9-people, .v9-esc-row, .v9-master-cred { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   V10 · Linha do tempo única (atividades + agenda + fases + documentos)
+   ========================================================================== */
+.v10-tl-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.v10-tl-filter button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 99px; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; color: var(--p6-ink-3); background: var(--p6-surface-2); border: 1px solid var(--p6-line); transition: all .2s; }
+.v10-tl-filter button em { font-style: normal; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 99px; background: #fff; color: var(--p6-ink-3); }
+.v10-tl-filter button:hover { border-color: #b7cbd9; }
+.v10-tl-filter button.on { color: #fff; background: linear-gradient(135deg, var(--p6-cyan-400, #10c1fc), var(--p6-teal-600, #0b7d97)); border-color: transparent; box-shadow: 0 8px 16px -10px rgba(11, 152, 181, .9); }
+.v10-tl-filter button.on em { background: rgba(255, 255, 255, .25); color: #fff; }
+.v7-timeline.v10-timeline { max-height: 380px; padding-left: 34px; gap: 12px; border-left: 0; background: linear-gradient(#e3edf3, #e3edf3) 12px 0 / 2px 100% no-repeat; }
+.v10-timeline li::before { display: none; }
+.v10-timeline li > i { --c: #7d8f9e; position: absolute; left: -32px; top: 0; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--c); box-shadow: 0 0 0 3px #fff; }
+.v10-timeline li.k-atividade > i { --c: #2f7de1; } .v10-timeline li.k-agenda > i { --c: #0b98b5; } .v10-timeline li.k-fase > i { --c: #0b1f33; }
+.v10-timeline li.k-doc > i { --c: #0f9a68; } .v10-timeline li.k-escalonamento > i { --c: #e0475f; } .v10-timeline li.k-master > i { --c: #6e54d9; }
+.v10-timeline li.k-fase span { font-weight: 700; color: var(--p6-ink); }
+.v10-timeline li.k-escalonamento span { color: #a8243c; }
+.v10-timeline li.v10-more button { align-self: flex-start; font: inherit; font-size: 12px; font-weight: 750; color: var(--p6-teal-600, #0b7d97); background: none; border: 0; padding: 2px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

@@ -77,7 +77,7 @@ export async function POST(req: Request) {
   await transact((st: State) => {
     const pp = st.projects.find(x => x.id === p.id); if (!pp) return;
     const text = `Escalonado (${urgency}) para ${recipients.map(r => r.sector ? `${r.name} · ${r.sector}` : r.name).join(", ")}. Pedido: ${message}`;
-    pp.timeline = [{ id: crypto.randomUUID(), at: now, kind: "escalonamento", author: who.name, text }, ...(pp.timeline || [])].slice(0, 200);
+    pp.timeline = [{ id: crypto.randomUUID(), at: now, kind: "escalonamento", author: who.name, text }, ...(pp.timeline || [])];
     pp.updatedAt = now;
     audit(st, "projects", "escalonamento enviado", pp.id, `${client} -> ${recipients.map(r => r.email).join(", ")}`);
   });

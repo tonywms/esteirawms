@@ -3,7 +3,7 @@
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, Hand, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, GitBranch, Hand, ListChecks, MessageSquare, MessageSquarePlus, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
 import { BALL, PHASES, ballOf, canMove, docOf, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
 import type { PhaseDoc } from "@/lib/types";
@@ -25,6 +25,12 @@ async function patchProject(id: string, body: Record<string, unknown>) {
   return j as Project;
 }
 
+// V10 · tipos de registro da linha do tempo (atividades e agenda entram sozinhas)
+const TL_KINDS: Record<string, { label: string; Icon: typeof ListChecks }> = {
+  atividade: { label: "Atividades", Icon: ListChecks }, agenda: { label: "Agenda", Icon: CalendarClock }, fase: { label: "Fases", Icon: GitBranch },
+  doc: { label: "Documentos", Icon: Paperclip }, escalonamento: { label: "Escalonamentos", Icon: Megaphone }, master: { label: "Master", Icon: ShieldCheck }, nota: { label: "Notas", Icon: MessageSquare },
+};
+const tlGroup = (k?: string) => (k && TL_KINDS[k] ? k : "nota");
 const DOC_STATE_LABEL: Record<DocState, string> = { ok: "anexado", waived: "liberado sem PDF (master)", missing: "PENDENTE — fase já passou sem o documento", pending: "pendente: necessário para avançar", sent: "enviado ao cliente — aguardando assinatura", skipped: "fase não utilizada", future: "fase futura" };
 function DocIcon({ s, size = 13 }: { s: DocState; size?: number }) {
   return s === "ok" ? <FileCheck2 size={size} /> : s === "waived" ? <ShieldCheck size={size} /> : s === "sent" ? <FileClock size={size} /> : s === "skipped" ? <FileMinus2 size={size} /> : s === "future" ? <FileText size={size} /> : <FileX2 size={size} />;
@@ -114,6 +120,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   const [note, setNote] = useState(""), [busy, setBusy] = useState(""), [msg, setMsg] = useState(""), [msgErr, setMsgErr] = useState(false);
   const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState(""), [meEmail, setMeEmail] = useState("");
   const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false);
+  const [tlKind, setTlKind] = useState(""), [tlAll, setTlAll] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => { setMeName(j.name || ""); setMeEmail(j.email || ""); }).catch(() => {}); }, []);
   const docs = docStates(p);
@@ -136,7 +143,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         x.send(file);
       });
       const doc: PhaseDoc = { path: t.path, name: file.name, size: file.size, uploadedAt: new Date().toISOString(), uploadedBy: meName || undefined };
-      const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF anexado · ${meta.doc}: ${file.name}` }, ...(p.timeline || [])].slice(0, 200);
+      const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF anexado · ${meta.doc}: ${file.name}` }, ...(p.timeline || [])];
       await patchProject(p.id, { phases: { ...(p.phases || {}), [phase]: { ...(p.phases?.[phase] || {}), doc, docSentAt: null } }, timeline: tl, lastMovement: todayISO() });
       await onRefresh(); flash(`${meta.doc} anexado`);
     } catch (e) { flash(e instanceof Error ? e.message : "Falha ao anexar.", true); }
@@ -155,7 +162,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
     setConfirmBox({ icon: "trash", title: "Remover este documento?", message: `O ${meta.doc.toLowerCase()} deixará de valer para a fase ${meta.short}. Se a fase já foi concluída, o projeto volta a aparecer com documentação pendente.`,
       details: [{ label: "Arquivo", value: doc.name }, { label: "Fase", value: meta.short }, { label: "Anexado em", value: new Date(doc.uploadedAt).toLocaleString("pt-BR") }], confirmLabel: "Sim, remover documento", cancelLabel: "Manter documento",
       onConfirm: async () => {
-        const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF removido · ${meta.doc}: ${doc.name}` }, ...(p.timeline || [])].slice(0, 200);
+        const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF removido · ${meta.doc}: ${doc.name}` }, ...(p.timeline || [])];
         await patchProject(p.id, { phases: { ...(p.phases || {}), [k2]: { ...(p.phases?.[k2] || {}), doc: null } }, timeline: tl });
         await onRefresh(); flash("Documento removido");
       } });
@@ -165,7 +172,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   async function toggleSent(k2: PhaseKey) {
     const meta = PHASES.find(x => x.key === k2)!, on = !p.phases?.[k2]?.docSentAt, cur = k2 === k;
     const text = on ? `${meta.doc} enviado ao cliente para assinatura` : `${meta.doc}: envio ao cliente desmarcado`;
-    const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text }, ...(p.timeline || [])].slice(0, 200);
+    const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text }, ...(p.timeline || [])];
     setBusy("sent");
     try {
       await patchProject(p.id, { phases: { ...(p.phases || {}), [k2]: { ...(p.phases?.[k2] || {}), docSentAt: on ? todayISO() : null, docSentBy: on ? meName || undefined : undefined } }, timeline: tl, lastMovement: todayISO(), ...(on && cur ? { ballWith: "Cliente" } : {}) });
@@ -179,7 +186,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   async function save(label: string, body: Record<string, unknown>, event?: string) {
     setBusy(label); setMsg("");
     try {
-      const tl = event ? [{ id: crypto.randomUUID(), at: new Date().toISOString(), text: event, kind: "nota" }, ...(p.timeline || [])].slice(0, 200) : undefined;
+      const tl = event ? [{ id: crypto.randomUUID(), at: new Date().toISOString(), text: event, kind: "nota" }, ...(p.timeline || [])] : undefined;
       await patchProject(p.id, { ...body, ...(tl ? { timeline: tl } : {}), lastMovement: todayISO() });
       await onRefresh(); flash("Salvo");
     } catch (e) { flash(e instanceof Error ? e.message : "Falha ao salvar", true); } finally { setBusy(""); }
@@ -276,8 +283,12 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <h3><MessageSquarePlus size={15} /> Linha do tempo</h3>
           <div className="v7-inline"><input className="v7-input" placeholder="Registrar acontecimento curto (ex.: cliente liberou servidor)" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && note.trim()) { void save("note", {}, note.trim()); setNote(""); } }} />
             <button className="btn primary" disabled={!note.trim() || !!busy} onClick={() => { void save("note", {}, note.trim()); setNote(""); }}>Registrar</button></div>
-          <ul className="v7-timeline">
-            {timeline.slice(0, 12).map(ev => <li key={ev.id} className={ev.kind === "fase" ? "phase" : ""}><time>{new Date(ev.at).toLocaleDateString("pt-BR")}</time><span>{ev.text}</span></li>)}
+          <div className="v10-tl-filter">{[["", "Todos", timeline.length] as const, ...Object.entries(TL_KINDS).map(([k, v]) => [k, v.label, timeline.filter(ev => tlGroup(ev.kind) === k).length] as const)].filter(([k, , n]) => !k || n > 0).map(([k, label, n]) => <button type="button" key={k || "all"} className={tlKind === k ? "on" : ""} onClick={() => { setTlKind(k); setTlAll(false); }}>{label} <em>{n}</em></button>)}</div>
+          <ul className="v7-timeline v10-timeline">
+            {(() => { const list = timeline.filter(ev => !tlKind || tlGroup(ev.kind) === tlKind); return <>
+              {(tlAll ? list : list.slice(0, 15)).map(ev => { const g = TL_KINDS[tlGroup(ev.kind)]; return <li key={ev.id} className={`k-${tlGroup(ev.kind)}`}><i title={g.label}><g.Icon size={12} /></i><time>{new Date(ev.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{ev.author ? ` · ${ev.author}` : ""}</time><span>{ev.text}</span></li>; })}
+              {list.length > 15 && <li className="v10-more"><button type="button" onClick={() => setTlAll(v => !v)}>{tlAll ? "Mostrar menos" : `Ver todos os ${list.length} registros`}</button></li>}
+            </>; })()}
             {p.notes && <li className="legacy"><time>Histórico</time><span>{p.notes}</span></li>}
             {!timeline.length && !p.notes && <li className="empty">Sem registros ainda.</li>}
           </ul>

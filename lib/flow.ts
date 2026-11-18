@@ -123,7 +123,7 @@ export function movePhasePatch(p: Project, to: PhaseKey, author = "Equipe") {
   phases[to] = { ...(phases[to] || {}), owner: phases[to]?.owner || phaseOwner(p, to), start: today, done: to === "fim" ? today : null };
   const statusFor: Record<PhaseKey, string> = { kickoff: "Pendente de Integração", dev: "Pendente de Integração", homolog: "Pendente de Implantação", campo: "Pendente de Implantação", golive: "Pendente de Finalização", fim: "Concluído" };
   const progressFor: Record<PhaseKey, number> = { kickoff: 5, dev: 25, homolog: 50, campo: 70, golive: 90, fim: 100 };
-  const timeline = [{ id: crypto.randomUUID(), at: now, kind: "fase", author, text: `Fase: ${phaseLabel(from)} → ${phaseLabel(to)}` }, ...(p.timeline || [])].slice(0, 200);
+  const timeline = [{ id: crypto.randomUUID(), at: now, kind: "fase", author, text: `Fase: ${phaseLabel(from)} → ${phaseLabel(to)}` }, ...(p.timeline || [])];
   return {
     phase: to, phases, timeline, lastMovement: today,
     status: isBlocked(p.status) && to !== "fim" ? p.status : statusFor[to],
