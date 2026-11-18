@@ -240,19 +240,19 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
         </section>
 
-        <section className="v7-box v9-esc-box">
-          <h3><Megaphone size={15} /> Escalonar entrave</h3>
-          <p>Gere o histórico do projeto em PDF com a marca WMS Expert e envie ao Comercial, à Diretoria ou a quem precisar intervir. O envio fica registrado na linha do tempo.</p>
-          <button type="button" className="btn primary" onClick={() => setEscalate(true)} disabled={!!busy}><Megaphone size={15} /> Escalonar com histórico em PDF</button>
+        <section className="v9-action esc">
+          <span className="v9-action-ico"><Megaphone size={20} /></span>
+          <div className="v9-action-txt"><h3>Escalonar entrave</h3><p>Envie o histórico do projeto em PDF (marca WMS Expert) ao Comercial, à Diretoria ou a quem precisar intervir. Fica registrado na linha do tempo.</p></div>
+          <div className="v9-action-btns"><button type="button" className="v9-btn esc" onClick={() => setEscalate(true)} disabled={!!busy}><Megaphone size={15} /> Escalonar com PDF</button></div>
         </section>
 
-        <section className="v7-box v9-master-box">
-          <h3><ShieldCheck size={15} /> Liberação master</h3>
-          <p>Para casos em que as etapas já aconteceram e o PDF não existe. Exige e-mail e senha de um usuário master e fica registrado.</p>
-          <div className="v9-master-actions">
-            {nextOptions.length > 0 && <button type="button" className="v7-mini-btn master" disabled={!!busy} onClick={() => openMaster("advance")}><ShieldCheck size={14} /> Avançar sem PDF</button>}
-            <button type="button" className="v7-mini-btn" disabled={!!busy || k === "fim"} onClick={() => openMaster("close")}><CheckCircle2 size={14} /> Encerrar projeto</button>
-            <button type="button" className="v7-mini-btn danger" disabled={!!busy} onClick={() => openMaster("cancel")}><Ban size={14} /> Cancelar projeto</button>
+        <section className="v9-action master">
+          <span className="v9-action-ico"><ShieldCheck size={20} /></span>
+          <div className="v9-action-txt"><h3>Liberação master</h3><p>Quando a etapa já aconteceu e o PDF não existe. Pede e-mail e senha do master e registra quem liberou e o motivo.</p></div>
+          <div className="v9-action-btns">
+            {nextOptions.length > 0 && <button type="button" className="v9-btn master" disabled={!!busy} onClick={() => openMaster("advance")}><ShieldCheck size={15} /> Avançar sem PDF</button>}
+            <button type="button" className="v9-btn" disabled={!!busy || k === "fim"} onClick={() => openMaster("close")}><CheckCircle2 size={15} /> Encerrar projeto</button>
+            <button type="button" className="v9-btn danger" disabled={!!busy} onClick={() => openMaster("cancel")}><Ban size={15} /> Cancelar projeto</button>
           </div>
         </section>
 
