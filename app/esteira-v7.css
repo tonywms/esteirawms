@@ -689,3 +689,9 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v7-gate.zs { background: #f4f7ff; border-color: #c7d7fb; color: #1d4ed8; }
 .v7-gate.zs > svg { color: #1d4ed8; }
 .v7-gate .v13-gate-zs { color: #1d4ed8 !important; background: #fff !important; border: 1px solid #c7d7fb !important; box-shadow: none !important; }
+/* V13.2 · aviso da fase: texto em uma linha inteira e botões logo abaixo (nada estoura) */
+.v7-gate { flex-wrap: wrap; align-items: flex-start; row-gap: 10px; }
+.v7-gate > svg { margin-top: 1px; }
+.v7-gate > span { flex: 1 1 calc(100% - 30px); min-width: 0; }
+.v7-gate > button { white-space: nowrap; }
+.v7-gate > span + button { margin-left: 28px; }
