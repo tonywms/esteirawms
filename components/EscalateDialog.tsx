@@ -1,4 +1,5 @@
 "use client";
+import { friendly } from "@/lib/friendly";
 // V9 · Escalonar entrave: escolhe os responsáveis (cadastrados em Equipe), escreve o pedido,
 // baixa o PDF premium do histórico e/ou envia por e-mail (registrado na linha do tempo).
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -34,7 +35,7 @@ export default function EscalateDialog({ data, project, client, onClose, onDone 
       const url = URL.createObjectURL(await r.blob());
       if (w) w.location.href = url; else { const a = document.createElement("a"); a.href = url; a.download = `escalonamento-${client}.pdf`; a.click(); }
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (e) { w?.close(); setError(e instanceof Error ? e.message : "Falha ao gerar o PDF."); }
+    } catch (e) { w?.close(); setError(friendly(e instanceof Error ? e.message : "Falha ao gerar o PDF.")); }
     finally { setBusy(""); }
   }
   async function send() {
@@ -46,7 +47,7 @@ export default function EscalateDialog({ data, project, client, onClose, onDone 
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Falha no envio.");
       await onDone(j.message || "Escalonamento enviado"); onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : "Falha no envio."); setBusy(""); }
+    } catch (e) { setError(friendly(e instanceof Error ? e.message : "Falha no envio.")); setBusy(""); }
   }
   if (!mounted) return null;
   const blocker = (project.blocker || "").trim() && project.blocker !== "-" ? project.blocker : "";

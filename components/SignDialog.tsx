@@ -1,4 +1,5 @@
 "use client";
+import { friendly } from "@/lib/friendly";
 // V13 · Enviar PDF para assinatura na ZapSign (documento da fase ou PDF de uma atividade).
 // Os contatos vêm do cadastro do cliente (o recomendado já vem marcado); dá para incluir outras pessoas na hora.
 import { useEffect, useRef, useState } from "react";
@@ -67,7 +68,7 @@ export default function SignDialog({ target, onClose, onDone }: { target: SignTa
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Falha no envio para a ZapSign.");
       await onDone(j.message || "Enviado para assinatura"); onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : "Falha no envio."); setBusy(false); }
+    } catch (e) { setError(friendly(e instanceof Error ? e.message : "Falha no envio.")); setBusy(false); }
   }
 
   if (!mounted) return null;

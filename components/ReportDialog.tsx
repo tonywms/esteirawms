@@ -1,4 +1,5 @@
 "use client";
+import { friendly } from "@/lib/friendly";
 // V11 · Status report para o cliente: mensagem, período, tipos de registro, revisão item a item,
 // PDFs assinados como anexos, baixar ou enviar por e-mail (fica registrado na linha do tempo).
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -7,6 +8,7 @@ import { Camera, CheckSquare2, Download, FileText, Info, Paperclip, RefreshCw, S
 import type { Project, State } from "@/lib/types";
 import { DEFAULT_REPORT_KINDS, REPORT_KINDS, clientText, projectFiles, reportEvents } from "@/lib/status-report";
 import { PHASES } from "@/lib/flow";
+import DateField from "./DateField";
 
 export default function ReportDialog({ data, project, client, onClose, onDone }: { data: State; project: Project; client: string; onClose: () => void; onDone: (msg: string) => void | Promise<void> }) {
   const [summary, setSummary] = useState(""), [kinds, setKinds] = useState<string[]>(DEFAULT_REPORT_KINDS), [since, setSince] = useState("");
@@ -42,7 +44,7 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
       const url = URL.createObjectURL(new Blob([out as BlobPart], { type: "application/pdf" }));
       if (w) w.location.href = url; else { const a = document.createElement("a"); a.href = url; a.download = j.filename; a.click(); }
       window.setTimeout(() => URL.revokeObjectURL(url), 120000);
-    } catch (e) { w?.close(); setError(e instanceof Error ? e.message : "Falha ao gerar o relatório."); }
+    } catch (e) { w?.close(); setError(friendly(e instanceof Error ? e.message : "Falha ao gerar o relatório.")); }
     finally { setBusy(""); }
   }
   async function send() {
@@ -53,7 +55,7 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "Falha no envio.");
       await onDone(j.message || "Status report enviado"); onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : "Falha no envio."); setBusy(""); }
+    } catch (e) { setError(friendly(e instanceof Error ? e.message : "Falha no envio.")); setBusy(""); }
   }
   if (!mounted) return null;
   return createPortal(
@@ -71,7 +73,7 @@ export default function ReportDialog({ data, project, client, onClose, onDone }:
             <div className="v11-kinds">{REPORT_KINDS.map(k => { const on = kinds.includes(k.key); return <button type="button" key={k.key} className={on ? "on" : ""} disabled={!!busy} onClick={() => setKinds(v => (on ? v.filter(x => x !== k.key) : [...v, k.key]))}>{on ? <CheckSquare2 size={15} /> : <Square size={15} />}{k.label}</button>; })}</div>
             <small className="v11-hint">Escalonamentos e liberações master nunca vão para o cliente. Notas internas ficam de fora por padrão.</small></div>
           <div className="v9-esc-row">
-            <label className="v9-field"><span>Histórico a partir de</span><input type="date" value={since} onChange={e => setSince(e.target.value)} disabled={!!busy} /></label>
+            <label className="v9-field"><span>Histórico a partir de</span><DateField value={since} onChange={setSince} disabled={!!busy} aria-label="Histórico a partir de" /></label>
             <div className="v9-field"><span>Documentos assinados</span>
               <button type="button" className={`v11-toggle ${annex ? "on" : ""}`} onClick={() => setAnnex(v => !v)} disabled={!!busy}>{annex ? <CheckSquare2 size={16} /> : <Square size={16} />} Anexar PDFs assinados ({signed.length})</button></div>
           </div>

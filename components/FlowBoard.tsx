@@ -12,6 +12,8 @@ import MasterDialog, { type MasterBox } from "./MasterDialog";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
 import SignDialog, { type SignTarget } from "./SignDialog";
+import DateField from "./DateField";
+import { friendly } from "@/lib/friendly";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
 import Select from "./Select";
 
@@ -123,10 +125,11 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   const [pct, setPct] = useState(0), [docPhase, setDocPhase] = useState<PhaseKey>("kickoff"), [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null), [meName, setMeName] = useState(""), [meEmail, setMeEmail] = useState("");
   const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false), [report, setReport] = useState(false), [signTarget, setSignTarget] = useState<SignTarget | null>(null);
   const [tlKind, setTlKind] = useState(""), [tlAll, setTlAll] = useState(false);
+  const [tab, setTab] = useState<"resumo" | "docs" | "hist" | "acoes">("resumo");
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => { setMeName(j.name || ""); setMeEmail(j.email || ""); }).catch(() => {}); }, []);
   const docs = docStates(p);
-  const flash = (text: string, err = false) => { setMsg(text); setMsgErr(err); if (!err) window.setTimeout(() => setMsg(""), 2600); };
+  const flash = (text: string, err = false) => { setMsg(err ? friendly(text) : text); setMsgErr(err); if (!err) window.setTimeout(() => setMsg(""), 2600); };
   const pickFile = (k2: PhaseKey) => { setDocPhase(k2); fileRef.current?.click(); };
   async function uploadDoc(file: File) {
     const phase = docPhase, meta = PHASES.find(x => x.key === phase)!;
@@ -216,7 +219,12 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <div className="v7-drawer-tags"><span className={`v7-health-pill v7-${h.health}`}><Dot h={h.health} />{healthLabel[h.health]}</span><span className="v7-ghost-pill"><Timer size={13} />{h.inPhase ?? "–"} dias na fase</span><span className="v7-ghost-pill"><Clock3 size={13} />{h.idle ?? "–"} dias sem movimento</span></div></div>
         <button className="v7-x" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
       </header>
+      <nav className="v14-tabs" role="tablist" aria-label="Seções do projeto">
+        {([["resumo", "Resumo", Target, 0], ["docs", "Documentos", Paperclip, docs.filter(d => d.state === "pending" || d.state === "missing" || d.state === "sent").length], ["hist", "Histórico", MessageSquarePlus, timeline.length], ["acoes", "Ações", Megaphone, 0]] as const).map(([key, label, Icon, n]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "on" : ""} onClick={() => setTab(key)}><Icon size={14} />{label}{n > 0 && <em className={key === "docs" ? "warn" : ""}>{n}</em>}</button>)}
+      </nav>
       <div className="v7-drawer-body">
+          {busy === "doc" && <div className="v7-upload"><span>Enviando {PHASES.find(x => x.key === docPhase)?.doc.toLowerCase()}… {pct}%</span><i><b style={{ width: `${pct}%` }} /></i></div>}
+        {tab === "resumo" && <>
         <ol className="v7-stepper">{PHASES.map((ph, i) => {
           const info = p.phases?.[ph.key];
           const state = i < idx ? "past" : i === idx ? "now" : "next";
@@ -230,7 +238,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           <h3><Flag size={15} /> Fase atual: {PHASES[idx].label}</h3>
           <div className="v7-grid2">
             <label><span>Dono da fase</span><Select value={phaseOwner(p)} onChange={e => void setPhaseOwner(e.target.value)} disabled={!!busy}>{[...new Set([phaseOwner(p), ...owners])].map(o => <option key={o}>{o}</option>)}</Select></label>
-            <label><span>Prazo da fase</span><input type="date" value={p.phases?.[k]?.due || ""} onChange={e => void setPhaseDue(e.target.value)} disabled={!!busy} /></label>
+            <label><span>Prazo da fase</span><DateField value={p.phases?.[k]?.due || ""} onChange={v => void setPhaseDue(v)} disabled={!!busy} aria-label="Prazo da fase" /></label>
           </div>
           <div className="v7-ball-switch"><span>Bola com</span>{BALL.map(b => <button key={b} className={ballOf(p) === b ? "on" : ""} disabled={!!busy} onClick={() => void save("ball", { ballWith: b }, `Bola passou para ${b}`)}>{b}</button>)}</div>
           <div className="v7-move">
@@ -241,6 +249,29 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           {nextOptions.length > 0 && !canMove(p, nextOptions[0]).ok && <div className={`v7-gate ${p.phases?.[k]?.sign?.status === "pending" ? "zs" : ""}`}>{p.phases?.[k]?.sign?.status === "pending" ? <PenLine size={18} /> : <FileX2 size={18} />}<span>{p.phases?.[k]?.sign?.status === "pending" ? `Aguardando o cliente assinar na ZapSign (${p.phases[k]!.sign!.signers.filter(x => x.status === "signed").length}/${p.phases[k]!.sign!.signers.length}). O avanço é liberado quando o PDF assinado chegar.` : canMove(p, nextOptions[0]).reason}</span>{PHASES[idx].doc && !p.phases?.[k]?.sign?.status?.startsWith("pend") && <button type="button" onClick={() => pickFile(k)} disabled={!!busy}><Upload size={14} /> Anexar agora</button>}{PHASES[idx].doc && !p.phases?.[k]?.sign && <button type="button" className="v13-gate-zs" onClick={() => setSignTarget({ kind: "phase", projectId: p.id, phase: k, docLabel: PHASES[idx].doc, client: data.clients.find(c => c.id === p.clientId) })} disabled={!!busy}><PenLine size={14} /> Enviar p/ assinatura</button>}<button type="button" className="v9-master-btn" onClick={() => openMaster("advance")} disabled={!!busy} title="Usuário master libera o avanço sem o PDF"><ShieldCheck size={14} /> Liberar (master)</button></div>}
         </section>
 
+        <section className="v7-box">
+          <h3><Target size={15} /> Próxima ação</h3>
+          <input className="v7-input" placeholder="O que precisa acontecer para o projeto andar?" value={next.nextAction} onChange={e => setNext(n => ({ ...n, nextAction: e.target.value }))} />
+          <div className="v7-grid2">
+            <label><span>Responsável</span><Select value={next.nextActionOwner} onChange={e => setNext(n => ({ ...n, nextActionOwner: e.target.value }))}><option value="">Selecione</option>{owners.map(o => <option key={o}>{o}</option>)}</Select></label>
+            <label><span>Até quando</span><DateField value={next.nextActionDue || ""} onChange={v => setNext(n => ({ ...n, nextActionDue: v }))} aria-label="Até quando" /></label>
+          </div>
+          <button className="btn primary v7-save" disabled={!!busy || !next.nextAction.trim()} onClick={() => void save("next", { ...next, nextActionDue: next.nextActionDue || null }, `Próxima ação: ${next.nextAction}${next.nextActionOwner ? ` (${next.nextActionOwner})` : ""}`)}>Salvar próxima ação</button>
+        </section>
+
+        <section className="v7-box">
+          <h3><AlertTriangle size={15} /> Empecilho</h3>
+          <div className="v7-inline"><input className="v7-input" placeholder="Nenhum empecilho" value={blocker} onChange={e => setBlocker(e.target.value)} />
+            <button className="btn outline" disabled={!!busy || blocker === (p.blocker === "-" ? "" : p.blocker)} onClick={() => void save("blk", { blocker: blocker.trim() }, blocker.trim() ? `Empecilho: ${blocker.trim()}` : "Empecilho resolvido")}>{blocker.trim() ? "Registrar" : "Resolver"}</button></div>
+        </section>
+
+        {(tasks.length > 0 || apps.length > 0) && <section className="v7-box">
+          <h3><CalendarClock size={15} /> Em andamento</h3>
+          {tasks.map(t => <div className="v7-mini" key={t.id}><ChevronRight size={13} /><span>{t.title}</span><small>{t.owner || "—"} · {t.dueDate ? fmtDate(t.dueDate) : "sem prazo"}</small></div>)}
+          {apps.map(a => <div className="v7-mini" key={a.id}><CalendarClock size={13} /><span>{a.title}</span><small>{a.consultant} · {fmtDate(a.date)} · {a.shift}</small></div>)}
+        </section>}
+        </>}
+        {tab === "docs" && <>
         <section className="v7-box v7-docs-box">
           <h3><Paperclip size={15} /> Documentos da esteira <em>{docs.filter(d => d.state === "ok" || d.state === "waived").length}/{docs.filter(d => d.state !== "skipped").length}</em></h3>
           {docs.map(d => { const doc = docOf(p, d.key); return <div key={d.key} className={`v7-doc-row s-${d.state}`}>
@@ -271,10 +302,25 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
                 </div>
               </div>; })()}
           </div>; })}
-          {busy === "doc" && <div className="v7-upload"><span>Enviando {PHASES.find(x => x.key === docPhase)?.doc.toLowerCase()}… {pct}%</span><i><b style={{ width: `${pct}%` }} /></i></div>}
-          <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
         </section>
-
+        </>}
+        {tab === "hist" && <>
+        <section className="v7-box">
+          <h3><MessageSquarePlus size={15} /> Linha do tempo</h3>
+          <div className="v7-inline"><input className="v7-input" placeholder="Registrar acontecimento curto (ex.: cliente liberou servidor)" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && note.trim()) { void save("note", {}, note.trim()); setNote(""); } }} />
+            <button className="btn primary" disabled={!note.trim() || !!busy} onClick={() => { void save("note", {}, note.trim()); setNote(""); }}>Registrar</button></div>
+          <div className="v10-tl-filter">{[["", "Todos", timeline.length] as const, ...Object.entries(TL_KINDS).map(([k, v]) => [k, v.label, timeline.filter(ev => tlGroup(ev.kind) === k).length] as const)].filter(([k, , n]) => !k || n > 0).map(([k, label, n]) => <button type="button" key={k || "all"} className={tlKind === k ? "on" : ""} onClick={() => { setTlKind(k); setTlAll(false); }}>{label} <em>{n}</em></button>)}</div>
+          <ul className="v7-timeline v10-timeline">
+            {(() => { const list = timeline.filter(ev => !tlKind || tlGroup(ev.kind) === tlKind); return <>
+              {(tlAll ? list : list.slice(0, 15)).map(ev => { const g = TL_KINDS[tlGroup(ev.kind)]; return <li key={ev.id} className={`k-${tlGroup(ev.kind)}`}><i title={g.label}><g.Icon size={12} /></i><time>{new Date(ev.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{ev.author ? ` · ${ev.author}` : ""}</time><span>{ev.text}</span></li>; })}
+              {list.length > 15 && <li className="v10-more"><button type="button" onClick={() => setTlAll(v => !v)}>{tlAll ? "Mostrar menos" : `Ver todos os ${list.length} registros`}</button></li>}
+            </>; })()}
+            {p.notes && <li className="legacy"><time>Histórico</time><span>{p.notes}</span></li>}
+            {!timeline.length && !p.notes && <li className="empty">Sem registros ainda.</li>}
+          </ul>
+        </section>
+        </>}
+        {tab === "acoes" && <>
         <section className="v9-action report">
           <span className="v9-action-ico"><FileText size={20} /></span>
           <div className="v9-action-txt"><h3>Status report para o cliente</h3><p>Relatório com andamento por etapa, próximos passos, histórico e os PDFs assinados de cada fase anexados. Baixe ou envie por e-mail.</p></div>
@@ -296,43 +342,8 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
             <button type="button" className="v9-btn danger" disabled={!!busy} onClick={() => openMaster("cancel")}><Ban size={15} /> Cancelar projeto</button>
           </div>
         </section>
-
-        <section className="v7-box">
-          <h3><Target size={15} /> Próxima ação</h3>
-          <input className="v7-input" placeholder="O que precisa acontecer para o projeto andar?" value={next.nextAction} onChange={e => setNext(n => ({ ...n, nextAction: e.target.value }))} />
-          <div className="v7-grid2">
-            <label><span>Responsável</span><Select value={next.nextActionOwner} onChange={e => setNext(n => ({ ...n, nextActionOwner: e.target.value }))}><option value="">Selecione</option>{owners.map(o => <option key={o}>{o}</option>)}</Select></label>
-            <label><span>Até quando</span><input type="date" value={next.nextActionDue || ""} onChange={e => setNext(n => ({ ...n, nextActionDue: e.target.value }))} /></label>
-          </div>
-          <button className="btn primary v7-save" disabled={!!busy || !next.nextAction.trim()} onClick={() => void save("next", { ...next, nextActionDue: next.nextActionDue || null }, `Próxima ação: ${next.nextAction}${next.nextActionOwner ? ` (${next.nextActionOwner})` : ""}`)}>Salvar próxima ação</button>
-        </section>
-
-        <section className="v7-box">
-          <h3><AlertTriangle size={15} /> Empecilho</h3>
-          <div className="v7-inline"><input className="v7-input" placeholder="Nenhum empecilho" value={blocker} onChange={e => setBlocker(e.target.value)} />
-            <button className="btn outline" disabled={!!busy || blocker === (p.blocker === "-" ? "" : p.blocker)} onClick={() => void save("blk", { blocker: blocker.trim() }, blocker.trim() ? `Empecilho: ${blocker.trim()}` : "Empecilho resolvido")}>{blocker.trim() ? "Registrar" : "Resolver"}</button></div>
-        </section>
-
-        <section className="v7-box">
-          <h3><MessageSquarePlus size={15} /> Linha do tempo</h3>
-          <div className="v7-inline"><input className="v7-input" placeholder="Registrar acontecimento curto (ex.: cliente liberou servidor)" value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && note.trim()) { void save("note", {}, note.trim()); setNote(""); } }} />
-            <button className="btn primary" disabled={!note.trim() || !!busy} onClick={() => { void save("note", {}, note.trim()); setNote(""); }}>Registrar</button></div>
-          <div className="v10-tl-filter">{[["", "Todos", timeline.length] as const, ...Object.entries(TL_KINDS).map(([k, v]) => [k, v.label, timeline.filter(ev => tlGroup(ev.kind) === k).length] as const)].filter(([k, , n]) => !k || n > 0).map(([k, label, n]) => <button type="button" key={k || "all"} className={tlKind === k ? "on" : ""} onClick={() => { setTlKind(k); setTlAll(false); }}>{label} <em>{n}</em></button>)}</div>
-          <ul className="v7-timeline v10-timeline">
-            {(() => { const list = timeline.filter(ev => !tlKind || tlGroup(ev.kind) === tlKind); return <>
-              {(tlAll ? list : list.slice(0, 15)).map(ev => { const g = TL_KINDS[tlGroup(ev.kind)]; return <li key={ev.id} className={`k-${tlGroup(ev.kind)}`}><i title={g.label}><g.Icon size={12} /></i><time>{new Date(ev.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}{ev.author ? ` · ${ev.author}` : ""}</time><span>{ev.text}</span></li>; })}
-              {list.length > 15 && <li className="v10-more"><button type="button" onClick={() => setTlAll(v => !v)}>{tlAll ? "Mostrar menos" : `Ver todos os ${list.length} registros`}</button></li>}
-            </>; })()}
-            {p.notes && <li className="legacy"><time>Histórico</time><span>{p.notes}</span></li>}
-            {!timeline.length && !p.notes && <li className="empty">Sem registros ainda.</li>}
-          </ul>
-        </section>
-
-        {(tasks.length > 0 || apps.length > 0) && <section className="v7-box">
-          <h3><CalendarClock size={15} /> Em andamento</h3>
-          {tasks.map(t => <div className="v7-mini" key={t.id}><ChevronRight size={13} /><span>{t.title}</span><small>{t.owner || "—"} · {t.dueDate ? fmtDate(t.dueDate) : "sem prazo"}</small></div>)}
-          {apps.map(a => <div className="v7-mini" key={a.id}><CalendarClock size={13} /><span>{a.title}</span><small>{a.consultant} · {fmtDate(a.date)} · {a.shift}</small></div>)}
-        </section>}
+        </>}
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
       </div>
       <footer className="v7-drawer-foot">
         <span className={`v7-msg${msgErr ? " err" : ""}`}>{msg}</span>

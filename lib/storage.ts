@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import {friendly} from "./friendly";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { EntityName, State } from "./types";
@@ -53,7 +54,7 @@ export async function replaceState(next:State){
  if(storageMode()==="supabase"){await sbReplace(next);return {clients:next.clients.length,projects:next.projects.length,tasks:next.tasks.length}}
  return transact(state=>{Object.assign(state,next);return {clients:next.clients.length,projects:next.projects.length,tasks:next.tasks.length}});
 }
-export const problem=(message:string,status=400)=>Response.json({error:message},{status});
+export const problem=(message:string,status=400)=>{const nice=friendly(message);if(nice!==message)console.error("[esteira]",message);return Response.json(nice!==message?{error:nice,detail:message}:{error:message},{status});};
 const required=(value:unknown)=>typeof value==="string"&&value.trim().length>0;
 export function validate(entity:EntityName, value:Record<string,unknown>,s:State,id?:string):string|null{
  const existing=(s[entity] as unknown as {id:string}[]);

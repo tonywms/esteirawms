@@ -1,4 +1,5 @@
 "use client";
+import { friendly } from "@/lib/friendly";
 // V9 · Liberação master: avançar sem PDF, dispensar um PDF, encerrar ou cancelar o projeto.
 // Pede e-mail + senha do usuário master a cada liberação e registra o motivo na linha do tempo.
 import { useEffect, useRef, useState } from "react";
@@ -49,7 +50,7 @@ export default function MasterDialog({ box, onClose, onDone }: { box: MasterBox;
       if (!r.ok) throw new Error(j.error || "Liberação recusada.");
       await onDone(j.message || "Liberado");
       onClose();
-    } catch (err) { setError(err instanceof Error ? err.message : "Falha na liberação."); setPassword(""); setBusy(false); }
+    } catch (err) { setError(friendly(err instanceof Error ? err.message : "Falha na liberação.")); setPassword(""); setBusy(false); }
   }
   if (!mounted) return null;
   const danger = box.action === "cancel";

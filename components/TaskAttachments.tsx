@@ -7,6 +7,7 @@ import { Camera, CheckCircle2, Clock3, Eye, FileText, ImagePlus, Paperclip, PenL
 import SignDialog from "./SignDialog";
 import type { TaskAttachment } from "@/lib/types";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
+import { friendly } from "@/lib/friendly";
 import { attachCall, checkFile, fileKind, setPending, uploadTaskFile } from "@/lib/task-uploads";
 
 const call = attachCall;
@@ -19,7 +20,7 @@ export default function TaskAttachments({ taskId, initial }: { taskId: string; i
   const setQueueFiles = (files: File[]) => { setQueue(files); setPending(files); };
   const [previews, setPreviews] = useState<string[]>([]);
   useEffect(() => { const urls = queue.map(f => (fileKind(f) === "image" ? URL.createObjectURL(f) : "")); setPreviews(urls); return () => urls.forEach(u => u && URL.revokeObjectURL(u)); }, [queue]);
-  const flash = (m: string, e = false) => { setMsg(m); setErr(e); window.setTimeout(() => setMsg(""), 4500); };
+  const flash = (m: string, e = false) => { setMsg(e ? friendly(m) : m); setErr(e); window.setTimeout(() => setMsg(""), 4500); };
 
   const loadThumbs = useCallback(async (list: TaskAttachment[]) => {
     const imgs = list.filter(a => a.type === "image" && !thumbs[a.id]);

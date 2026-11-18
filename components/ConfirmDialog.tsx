@@ -1,4 +1,5 @@
 "use client";
+import { friendly } from "@/lib/friendly";
 // V7.5 · Modal de confirmação no padrão visual da Esteira (substitui o window.confirm do navegador).
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -28,7 +29,7 @@ export default function ConfirmDialog({ box, onClose }: { box: ConfirmBox; onClo
   async function confirm() {
     if (busy) return; setBusy(true); setError("");
     try { await box.onConfirm(); onClose(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Não foi possível excluir."); setBusy(false); }
+    catch (e) { setError(friendly(e instanceof Error ? e.message : "Não foi possível excluir.")); setBusy(false); }
   }
   if (!mounted) return null;
   const Icon = box.icon === "calendar" ? CalendarX2 : Trash2;
