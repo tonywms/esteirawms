@@ -1159,3 +1159,19 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v18-race-line { stroke: #0e2a40; stroke-width: 1.5; stroke-dasharray: 4 5; opacity: .35; }
 .v18-race-lab { transition: transform .35s cubic-bezier(.3, .7, .2, 1); }
 .v18-race-pos { font-weight: 850; fill: #8a9bab; font-size: 11.5px; }
+
+/* ==========================================================================
+   V19 · Fotos dos consultores nas telas (só quem tem foto; o resto segue com as iniciais)
+   ========================================================================== */
+.v19-photo { flex: none; display: inline-block; border-radius: 99px; object-fit: cover; background: #e8eef3; vertical-align: middle; }
+.v19-person { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.avatar.v19-has-photo { position: relative; overflow: hidden; border-radius: 99px !important; color: transparent !important; }
+.avatar.v19-has-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.v7-card-owner .v7-av-photo { box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(10, 127, 156, .35); }
+.v7-owner-tag .v19-photo { margin-right: 2px; }
+.v17-rowh.v19-rowh { display: flex; align-items: center; gap: 9px; }
+.v17-rowh > span { display: grid; min-width: 0; }
+.v17-rowh > span b, .v17-rowh > span small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v17-rowh .v19-photo { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #9fdbe6; }
+.row.agenda.v19-tv-face { align-items: center; }
+.row.agenda.v19-tv-face .v19-photo { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }

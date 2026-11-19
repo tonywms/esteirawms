@@ -6,6 +6,8 @@ import type { Project, State } from "@/lib/types";
 import { DIMS, CYCLE_GOAL, PHASE_GOALS, attackFirst, dataQuality, gargalosSummary, heatmap, phaseTimes, type DimKey, type GroupBy } from "@/lib/gargalos";
 import { PHASES } from "@/lib/flow";
 import { todayISO } from "@/lib/metrics";
+import { avatarUrl } from "@/lib/avatars";
+import { PersonPhoto } from "./PersonPhoto";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onOpen: (p: Project) => void; onNavigate: (path: string) => void };
@@ -92,7 +94,7 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
             <span />
             {DIMS.map(d => <span key={d.key} className="v17-colh"><b>{d.label}</b><small>{d.sub}</small></span>)}
             {map.rows.map(r => <div key={r.key} className="v17-row" style={{ display: "contents" }}>
-              <span className="v17-rowh"><b title={r.label}>{r.label}</b><small>{r.sub}</small></span>
+              <span className={`v17-rowh ${by === "consultor" && avatarUrl(r.label) ? "v19-rowh" : ""}`}>{by === "consultor" && <PersonPhoto name={r.label} size={30} />}<span><b title={r.label}>{r.label}</b><small>{r.sub}</small></span></span>
               {DIMS.map(d => { const c = r.cells[d.key]; const on = current?.row === r.key && current?.dim === d.key;
                 return <button key={d.key} type="button" className={`v17-cell l${c.level} ${on ? "on" : ""}`} disabled={!c.hits.length && !c.missing.length && c.level === 0} aria-label={`${r.label}, ${d.label}: ${c.text} (${LEVEL[c.level]})`} onClick={() => setSel({ row: r.key, dim: d.key })}><b>{c.text}</b><small>{c.sub}</small></button>; })}
             </div>)}

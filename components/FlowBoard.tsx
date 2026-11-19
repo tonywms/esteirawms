@@ -15,6 +15,8 @@ import SignDialog, { type SignTarget } from "./SignDialog";
 import DateField from "./DateField";
 import { friendly } from "@/lib/friendly";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
+import { avatarUrl } from "@/lib/avatars";
+import { PersonPhoto } from "./PersonPhoto";
 import Select from "./Select";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onEdit: (p: Project) => void; onOpen: (p: Project) => void };
@@ -107,7 +109,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
       {rows.filter(r => r.phase === ph.key).sort((a, b) => ({ red: 0, amber: 1, green: 2, done: 3 }[a.h.health] - { red: 0, amber: 1, green: 2, done: 3 }[b.h.health])).map(({ p, h }) =>
         <button key={p.id} className={`v7-card v7-${h.health}`} onClick={() => onPick(p.id)} title={h.reasons.join(" · ")}>
           <div className="v7-card-top"><strong>{clientName(data, p.clientId)}</strong><Dot h={h.health} /></div>
-          <div className="v7-card-owner"><span className="v7-av">{initials(phaseOwner(p))}</span>{phaseOwner(p)}</div>
+          <div className="v7-card-owner">{avatarUrl(phaseOwner(p)) ? <PersonPhoto name={phaseOwner(p)} size={22} className="v7-av-photo" /> : <span className="v7-av">{initials(phaseOwner(p))}</span>}{phaseOwner(p)}</div>
           <div className="v7-card-meta">
             <span title="Dias na fase"><Timer size={12} />{h.inPhase ?? "–"}d</span>
             <span className={`v7-ball-chip b-${ballOf(p).split(" ")[0].toLowerCase()}`} title="Com quem está a bola"><Hand size={11} />{ballOf(p)}</span>
@@ -353,7 +355,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         <span className={`v7-msg${msgErr ? " err" : ""}`}>{msg}</span>
         <button className="btn outline" onClick={() => onEdit(p)}><Wrench size={15} /> Editar cadastro</button>
         <button className="btn outline" onClick={() => onOpen(p)}><ExternalLink size={15} /> Ficha completa</button>
-        <span className="v7-owner-tag"><UserRound size={13} />{phaseOwner(p)}</span>
+        <span className="v7-owner-tag">{avatarUrl(phaseOwner(p)) ? <PersonPhoto name={phaseOwner(p)} size={18} /> : <UserRound size={13} />}{phaseOwner(p)}</span>
       </footer>
     </aside>
     {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}

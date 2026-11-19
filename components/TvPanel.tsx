@@ -6,6 +6,8 @@ import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, File
 import type { State } from "@/lib/types";
 import { PHASES, ballOf, docStates, flowSummary, phaseIndex, phaseOwner, unlockSummary, type Health } from "@/lib/flow";
 import { fmtDate, todayISO } from "@/lib/metrics";
+import { avatarUrl } from "@/lib/avatars";
+import { PersonPhoto } from "./PersonPhoto";
 import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
@@ -117,7 +119,7 @@ export default function TvPanel() {
         </div>}
         <div className="panel-tv">
           <h3><CalendarClock /> Agenda de hoje <em>{agenda.length}</em></h3>
-          <div className="rows">{agenda.slice(0, s.goLives.length ? 4 : 8).map(a => <div key={a.id} className="row agenda"><i /><div><strong>{a.consultant}</strong><small>{name(a.clientId)} · {a.title}</small></div><span className="date">{a.shift}</span></div>)}
+          <div className="rows">{agenda.slice(0, s.goLives.length ? 4 : 8).map(a => <div key={a.id} className={`row agenda ${avatarUrl(a.consultant) ? "v19-tv-face" : ""}`}>{avatarUrl(a.consultant) ? <PersonPhoto name={a.consultant} size={40} /> : <i />}<div><strong>{a.consultant}</strong><small>{name(a.clientId)} · {a.title}</small></div><span className="date">{a.shift}</span></div>)}
             {agenda.length > (s.goLives.length ? 4 : 8) && <div className="more">+{agenda.length - (s.goLives.length ? 4 : 8)} alocações</div>}
             {!agenda.length && <div className="muted">Sem consultores alocados hoje</div>}</div>
         </div>
