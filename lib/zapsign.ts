@@ -5,7 +5,7 @@
 import { audit, transact } from "./storage";
 import { sbDocUploadTicket, sbFileUploadTicket, sbUploadBytes } from "./supabase-store";
 import { PHASES } from "./flow";
-import type { SignRequest, State, TaskAttachment } from "./types";
+import type { ExtraDoc, SignRequest, State, TaskAttachment } from "./types";
 
 const env = (k: string) => (process.env[k] || "").trim();
 export const zapsignConfigured = () => !!env("ZAPSIGN_TOKEN");
@@ -50,12 +50,13 @@ export const signFromDoc = (d: ZsDoc, prev?: Partial<SignRequest>): SignRequest 
   completedAt: d.status === "signed" ? prev?.completedAt || new Date().toISOString() : null,
 });
 
-/** external_id: "esteira:phase:<projeto>:<fase>" ou "esteira:task:<atividade>:<anexo>" */
+/** external_id: "esteira:phase:<projeto>:<fase>", "esteira:task:<atividade>:<anexo>" ou "esteira:extra:<projeto>:<documento>" (V20) */
 export const extPhase = (projectId: string, phase: string) => `esteira:phase:${projectId}:${phase}`;
 export const extTask = (taskId: string, attId: string) => `esteira:task:${taskId}:${attId}`;
+export const extExtra = (projectId: string, docId: string) => `esteira:extra:${projectId}:${docId}`;
 function parseExt(ext?: string) {
-  const m = (ext || "").match(/^esteira:(phase|task):([^:]+):([^:]+)$/);
-  return m ? { kind: m[1] as "phase" | "task", a: m[2], b: m[3] } : null;
+  const m = (ext || "").match(/^esteira:(phase|task|extra):([^:]+):([^:]+)$/);
+  return m ? { kind: m[1] as "phase" | "task" | "extra", a: m[2], b: m[3] } : null;
 }
 
 /**
@@ -76,11 +77,13 @@ export async function syncZapsignDoc(token: string, by = "ZapSign"): Promise<{ o
   let stored: { path: string } | null = null;
   const already = await transact((s: State) => {
     if (t.kind === "phase") return s.projects.find(p => p.id === t.a)?.phases?.[t.b]?.sign?.status === "signed";
+    if (t.kind === "extra") return !!s.projects.find(p => p.id === t.a)?.extraDocs?.find(x => x.id === t.b)?.signed;
     const task = s.tasks.find(x => x.id === t.a);
     return task?.attachments?.find(x => x.id === t.b)?.sign?.status === "signed";
   });
   if (file && !already) {
     if (t.kind === "phase") { const up = await sbDocUploadTicket(t.a, t.b); await sbUploadBytes(up.uploadUrl, up.apikey, file); stored = { path: up.path }; }
+    else if (t.kind === "extra") { const up = await sbDocUploadTicket(t.a, "extra"); await sbUploadBytes(up.uploadUrl, up.apikey, file); stored = { path: up.path }; }
     else { const s0 = await transact((s: State) => s.tasks.find(x => x.id === t.a)?.projectId || ""); const up = await sbFileUploadTicket(s0, t.a, "pdf"); await sbUploadBytes(up.uploadUrl, up.apikey, file); stored = { path: up.path }; }
   }
   return transact((s: State) => {
@@ -101,6 +104,22 @@ export async function syncZapsignDoc(token: string, by = "ZapSign"): Promise<{ o
       p.phases = { ...(p.phases || {}), [t.b]: info };
       if (text) { p.timeline = [{ id: crypto.randomUUID(), at: now, kind: "doc", author: by, text }, ...(p.timeline || [])]; p.updatedAt = now; audit(s, "projects", "zapsign", p.id, text); }
       return { ok: true, status: next.status, message: next.status === "signed" ? "Documento assinado e anexado à fase" : next.status === "refused" ? "Assinatura recusada" : "Aguardando assinatura" };
+    }
+    if (t.kind === "extra") {
+      const p = s.projects.find(x => x.id === t.a); if (!p) return { ok: false, status: d.status, message: "Projeto não encontrado." };
+      const list: ExtraDoc[] = [...(p.extraDocs || [])]; const i = list.findIndex(x => x.id === t.b);
+      if (i < 0) return { ok: false, status: d.status, message: "Documento não encontrado." };
+      const prev = list[i].sign || undefined, next = signFromDoc(d, prev);
+      list[i] = { ...list[i], sign: next };
+      let text = "";
+      if (stored && next.status === "signed") {
+        list[i].signed = { path: stored.path, name: `${list[i].name.replace(/\.pdf$/i, "")} (assinado).pdf`, size: file?.length, uploadedAt: now };
+        text = `Documento avulso “${list[i].title}” assinado via ZapSign por ${who}`;
+      } else if (prev?.status !== next.status && next.status === "refused") text = `ZapSign: documento avulso “${list[i].title}” RECUSADO pelo signatário`;
+      else if (JSON.stringify(prev?.signers?.map(x => x.status)) !== JSON.stringify(next.signers.map(x => x.status)) && who) text = `ZapSign: “${list[i].title}” — já assinaram: ${who}`;
+      p.extraDocs = list;
+      if (text) { p.timeline = [{ id: crypto.randomUUID(), at: now, kind: "doc", author: by, text }, ...(p.timeline || [])]; p.updatedAt = now; audit(s, "projects", "zapsign", p.id, text); }
+      return { ok: true, status: next.status, message: next.status === "signed" ? "Documento assinado e guardado no projeto" : next.status === "refused" ? "Assinatura recusada" : "Aguardando assinatura" };
     }
     const task = s.tasks.find(x => x.id === t.a); if (!task) return { ok: false, status: d.status, message: "Atividade não encontrada." };
     const list = [...(task.attachments || [])]; const i = list.findIndex(x => x.id === t.b);

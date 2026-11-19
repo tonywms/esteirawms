@@ -2,13 +2,13 @@
 import { audit, loadState, problem, transact } from "@/lib/storage";
 import { sbDocSignedUrl, sbFileSignedUrl, supabaseConfigured } from "@/lib/supabase-store";
 import { currentUser } from "@/lib/master";
-import { extPhase, extTask, signFromDoc, zapsignConfigured, zapsignSandbox, zsCreate, type SignerInput } from "@/lib/zapsign";
+import { extExtra, extPhase, extTask, signFromDoc, zapsignConfigured, zapsignSandbox, zsCreate, type SignerInput } from "@/lib/zapsign";
 import { PHASES, phaseOf } from "@/lib/flow";
 import type { State } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-type Body = { target?: "phase" | "task"; projectId?: string; phase?: string; path?: string; name?: string; taskId?: string; attachmentId?: string; signers?: SignerInput[]; message?: string; whatsapp?: boolean };
+type Body = { target?: "phase" | "task" | "extra"; title?: string; size?: number; extraId?: string; projectId?: string; phase?: string; path?: string; name?: string; taskId?: string; attachmentId?: string; signers?: SignerInput[]; message?: string; whatsapp?: boolean };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function GET() { return Response.json({ configured: zapsignConfigured(), sandbox: zapsignSandbox() }); }
@@ -63,6 +63,35 @@ export async function POST(req: Request) {
         audit(s, "tasks", "zapsign enviado", tt.id, a.name);
       });
       return Response.json({ ok: true, message: `Enviado para assinatura de ${signers.length} pessoa(s)`, signUrls: d.signers.map(x => ({ name: x.name, url: x.sign_url })) });
+    }
+    if (b.target === "extra") {
+      // V20 · Documento avulso (contrato, aditivo, termo...) — novo envio ou reenvio de um já cadastrado
+      const p = s0.projects.find(x => x.id === b.projectId);
+      if (!p) return problem("Projeto inválido.");
+      const prev = b.extraId ? (p.extraDocs || []).find(x => x.id === b.extraId) : null;
+      if (b.extraId && !prev) return problem("Documento não encontrado.");
+      if (prev?.signed) return problem("Este documento já está assinado.");
+      const path = prev ? prev.path : b.path || "";
+      if (!path.startsWith(`${p.id}/extra/`)) return problem("Arquivo inválido.");
+      const title = (prev?.title || String(b.title || "").trim() || String(b.name || "Documento").replace(/\.pdf$/i, "")).slice(0, 120);
+      const client = s0.clients.find(c => c.id === p.clientId)?.name || p.name;
+      const id = prev?.id || crypto.randomUUID();
+      const url = await sbDocSignedUrl(p.id, "extra", path);
+      const d = await zsCreate({ name: `${title} · ${client}`, urlPdf: url, externalId: extExtra(p.id, id), signers, message: b.message, whatsapp: b.whatsapp });
+      await transact((s: State) => {
+        const pp = s.projects.find(x => x.id === p.id); if (!pp) return;
+        const now = new Date().toISOString(), list = [...(pp.extraDocs || [])];
+        const fileName = prev?.name || b.name || `${title}.pdf`;
+        const sign = signFromDoc(d, { fileName, sentAt: now, sentBy: who.name, originalPath: path });
+        const i = list.findIndex(x => x.id === id);
+        if (i >= 0) list[i] = { ...list[i], sign };
+        else list.unshift({ id, title, name: fileName, path, size: Number(b.size) || undefined, uploadedAt: now, uploadedBy: who.name, sign, signed: null });
+        pp.extraDocs = list;
+        pp.timeline = [{ id: crypto.randomUUID(), at: now, kind: "doc", author: who.name, text: `Documento avulso “${title}” enviado para assinatura via ZapSign${zapsignSandbox() ? " (ambiente de testes)" : ""} → ${signers.map(x => `${x.name}${x.email ? ` <${x.email}>` : ""}`).join(", ")}` }, ...(pp.timeline || [])];
+        pp.updatedAt = now; pp.lastMovement = now.slice(0, 10);
+        audit(s, "projects", "zapsign enviado", pp.id, `${client} · ${title}`);
+      });
+      return Response.json({ ok: true, message: `“${title}” enviado para assinatura de ${signers.length} pessoa(s)`, signUrls: d.signers.map(x => ({ name: x.name, url: x.sign_url })) });
     }
     return problem("Destino inválido.");
   } catch (e) { return problem(e instanceof Error ? e.message : "Falha no envio para a ZapSign.", 502); }

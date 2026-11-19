@@ -12,7 +12,7 @@ export async function GET(_r:Request,context:{params:Promise<{entity:string}>}){
 export async function POST(request:Request,context:{params:Promise<{entity:string}>}){
  const {entity}=await context.params;if(!isEntity(entity))return problem("Cadastro inexistente.",404);
  try{
-  const body=await request.json() as Record<string,unknown>;const password=entity==="users"&&typeof body.password==="string"?body.password.trim():"";delete body.password;if(entity==="tasks")delete body.attachments;if(password&&password.length<8)return problem("A senha precisa ter pelo menos 8 caracteres.");if(password&&!passwordsAvailable())return problem("Senhas exigem o Supabase configurado.");
+  const body=await request.json() as Record<string,unknown>;const password=entity==="users"&&typeof body.password==="string"?body.password.trim():"";delete body.password;if(entity==="tasks")delete body.attachments;if(entity==="projects")delete body.extraDocs;if(password&&password.length<8)return problem("A senha precisa ter pelo menos 8 caracteres.");if(password&&!passwordsAvailable())return problem("Senhas exigem o Supabase configurado.");
   if(!body||typeof body!=="object"||Array.isArray(body))return problem("Dados inválidos.");
   const who=await currentUser().catch(()=>({name:""}));
   const result=await transact((state:State)=>{

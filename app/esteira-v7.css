@@ -1175,3 +1175,34 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v17-rowh .v19-photo { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #9fdbe6; }
 .row.agenda.v19-tv-face { align-items: center; }
 .row.agenda.v19-tv-face .v19-photo { box-shadow: 0 0 0 2px rgba(255, 255, 255, .85); }
+
+/* ==========================================================================
+   V20 · Documentos avulsos para assinatura (aba Documentos do projeto)
+   ========================================================================== */
+.v20-extra { display: grid; gap: 10px; }
+.v20-hint { margin: -4px 0 2px; font-size: 12px; color: var(--p6-ink-3, #5d7387); line-height: 1.45; }
+.v20-new { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1.5px dashed #9fd3e2; background: linear-gradient(135deg, #f2fbfd, #f8fcfe); color: #0a7f9c; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.v20-new:hover { border-color: #0a98b5; background: #eaf8fb; }
+.v20-new > svg { flex: none; }
+.v20-new span { display: grid; gap: 1px; min-width: 0; }
+.v20-new b { font-size: 13px; font-weight: 820; color: #075f75; }
+.v20-new small { font-size: 11.5px; font-weight: 600; color: #4f7488; }
+.v20-doc { display: grid; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid #e3ebf1; background: #fff; min-width: 0; }
+.v20-doc.s-ok { border-color: #bfe6cc; background: #f6fcf8; }
+.v20-doc.s-refused { border-color: #f3c3c0; background: #fff8f7; }
+.v20-doc-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.v20-ico { flex: none; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: #eaf6fb; color: #0a7f9c; }
+.v20-doc.s-ok .v20-ico { background: #e3f6ea; color: #1e7a45; } .v20-doc.s-refused .v20-ico { background: #fde8e6; color: #c9302c; }
+.v20-txt { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.v20-txt strong { font-size: 13px; font-weight: 820; color: #17324a; overflow-wrap: anywhere; }
+.v20-txt small { font-size: 11.5px; color: #6b8194; font-weight: 600; overflow-wrap: anywhere; }
+.v20-badge { flex: none; font-size: 11px; font-weight: 820; padding: 4px 9px; border-radius: 99px; white-space: nowrap; background: #eef3f6; color: #5b6f80; }
+.v20-badge.s-ok { background: #e3f6ea; color: #1e6b3a; } .v20-badge.s-pending { background: #e6eefc; color: #1e4fa8; } .v20-badge.s-refused { background: #fde8e6; color: #b42318; }
+.v20-signers { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.v20-signers li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 8px; border-radius: 10px; background: #f6f9fb; font-size: 12px; font-weight: 700; color: #17324a; }
+.v20-signers li i { width: 8px; height: 8px; border-radius: 99px; background: #9aabbb; }
+.v20-signers li.st-signed i { background: #2fbf71; } .v20-signers li.st-refused i { background: #e04a3f; } .v20-signers li.st-link-opened i { background: #e5a21a; }
+.v20-signers li span { font-weight: 600; color: #6b8194; }
+.v20-signers li b { margin-left: auto; font-size: 11px; font-weight: 800; color: #3b5268; }
+.v20-signers li button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: #0a7f9c; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; padding: 0; }
+.v20-act { display: flex; flex-wrap: wrap; gap: 6px; }

@@ -2,7 +2,7 @@
 import { problem } from "@/lib/storage";
 import { sbDocSignedUrl, supabaseConfigured } from "@/lib/supabase-store";
 export const runtime = "nodejs";
-const PHASES = ["kickoff", "dev", "homolog", "campo", "golive"];
+const PHASES = ["kickoff", "dev", "homolog", "campo", "golive", "extra"]; // V20: "extra" = documentos avulsos
 export async function POST(req: Request) {
   if (!supabaseConfigured()) return problem("Anexos exigem o Supabase configurado.");
   const b = await req.json().catch(() => ({})) as { projectId?: string; phase?: string; path?: string; name?: string; download?: boolean };

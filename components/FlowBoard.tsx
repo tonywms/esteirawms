@@ -12,6 +12,7 @@ import MasterDialog, { type MasterBox } from "./MasterDialog";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
 import SignDialog, { type SignTarget } from "./SignDialog";
+import ExtraDocs from "./ExtraDocs";
 import DateField from "./DateField";
 import { friendly } from "@/lib/friendly";
 import { fmtDate, initials, todayISO } from "@/lib/metrics";
@@ -226,7 +227,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
         <button className="v7-x" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
       </header>
       <nav className="v14-tabs" role="tablist" aria-label="Seções do projeto">
-        {([["resumo", "Resumo", Target, 0], ["docs", "Documentos", Paperclip, docs.filter(d => d.state === "pending" || d.state === "missing" || d.state === "sent").length], ["hist", "Histórico", MessageSquarePlus, timeline.length], ["acoes", "Ações", Megaphone, 0]] as const).map(([key, label, Icon, n]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "on" : ""} onClick={() => setTab(key)}><Icon size={14} />{label}{n > 0 && <em className={key === "docs" ? "warn" : ""}>{n}</em>}</button>)}
+        {([["resumo", "Resumo", Target, 0], ["docs", "Documentos", Paperclip, docs.filter(d => d.state === "pending" || d.state === "missing" || d.state === "sent").length + (p.extraDocs || []).filter(d => d.sign && !d.signed).length], ["hist", "Histórico", MessageSquarePlus, timeline.length], ["acoes", "Ações", Megaphone, 0]] as const).map(([key, label, Icon, n]) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "on" : ""} onClick={() => setTab(key)}><Icon size={14} />{label}{n > 0 && <em className={key === "docs" ? "warn" : ""}>{n}</em>}</button>)}
       </nav>
       <div className="v7-drawer-body">
           {busy === "doc" && <div className="v7-upload"><span>Enviando {PHASES.find(x => x.key === docPhase)?.doc.toLowerCase()}… {pct}%</span><i><b style={{ width: `${pct}%` }} /></i></div>}
@@ -309,6 +310,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
               </div>; })()}
           </div>; })}
         </section>
+        <ExtraDocs project={p} client={data.clients.find(c => c.id === p.clientId)} onRefresh={onRefresh} flash={flash} onSign={setSignTarget} />
         </>}
         {tab === "hist" && <>
         <section className="v7-box">
