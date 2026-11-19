@@ -41,15 +41,30 @@ const fmtLong = (d: string) => { const t = new Date(d + "T12:00:00").toLocaleDat
 const pct = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 const signed = (v: number | null) => (v === null ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}`);
 
-/** Curva suave que não "passa do ponto" (monotone cubic). */
-function smooth(pts: { x: number; y: number }[]) {
-  if (!pts.length) return "";
-  if (pts.length === 1) return `M${pts[0].x},${pts[0].y}`;
+/** Inclinações da curva suave que não "passa do ponto" (monotone cubic). */
+function tangents(pts: { x: number; y: number }[]) {
   const n = pts.length, dx: number[] = [], m: number[] = [], t: number[] = [];
   for (let i = 0; i < n - 1; i++) { dx[i] = pts[i + 1].x - pts[i].x; m[i] = (pts[i + 1].y - pts[i].y) / (dx[i] || 1); }
   t[0] = m[0]; t[n - 1] = m[n - 2];
   for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
   for (let i = 0; i < n - 1; i++) { if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; } const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b; if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; } }
+  return { dx, t };
+}
+/** Altura exata da curva num x qualquer (usada pelos "corredores" do Reproduzir). */
+function evalSmooth(pts: { x: number; y: number }[], x: number) {
+  if (!pts.length) return null;
+  if (pts.length === 1 || x <= pts[0].x) return pts[0].y;
+  if (x >= pts[pts.length - 1].x) return pts[pts.length - 1].y;
+  const { dx, t } = tangents(pts);
+  let i = 0; while (i < pts.length - 2 && x > pts[i + 1].x) i++;
+  const h = dx[i] || 1, u = (x - pts[i].x) / h, u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * pts[i].y + (u3 - 2 * u2 + u) * h * t[i] + (-2 * u3 + 3 * u2) * pts[i + 1].y + (u3 - u2) * h * t[i + 1];
+}
+/** Curva suave que não "passa do ponto" (monotone cubic). */
+function smooth(pts: { x: number; y: number }[]) {
+  if (!pts.length) return "";
+  if (pts.length === 1) return `M${pts[0].x},${pts[0].y}`;
+  const n = pts.length, { dx, t } = tangents(pts);
   let d = `M${pts[0].x},${pts[0].y}`;
   for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3; d += ` C${pts[i].x + h},${pts[i].y + t[i] * h} ${pts[i + 1].x - h},${pts[i + 1].y - t[i + 1] * h} ${pts[i + 1].x},${pts[i + 1].y}`; }
   return d;
@@ -68,7 +83,7 @@ export default function Evolucao({ data, onNavigate }: Props) {
   const [by, setBy] = useState<GroupBy>("cliente"), [metric, setMetric] = useState<Metric>("avanco"), [period, setPeriod] = useState(30);
   const [hidden, setHidden] = useState<Set<string>>(new Set()), [focus, setFocus] = useState<string | null>(null), [hover, setHover] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false), [q, setQ] = useState(""), [allRows, setAllRows] = useState(false);
-  const [upTo, setUpTo] = useState<number | null>(null), [playing, setPlaying] = useState(false);
+  const [race, setRace] = useState<number | null>(null), [playing, setPlaying] = useState(false), [raced, setRaced] = useState(false);
   const wrap = useRef<HTMLDivElement>(null), [W, setW] = useState(900);
 
   const load = useCallback(async () => {
@@ -83,7 +98,8 @@ export default function Evolucao({ data, onNavigate }: Props) {
     const ro = new ResizeObserver(e => setW(Math.max(320, Math.round(e[0].contentRect.width))));
     ro.observe(el); return () => ro.disconnect();
   }, [payload]);
-  useEffect(() => { setHidden(new Set()); setShowAll(false); setFocus(null); setUpTo(null); setPlaying(false); setQ(""); }, [by]);
+  useEffect(() => { setHidden(new Set()); setShowAll(false); setFocus(null); setRace(null); setPlaying(false); setQ(""); }, [by]);
+  useEffect(() => { setRaced(false); }, [by, metric, period]);
   useEffect(() => { if (by === "cliente") setMetric(m => (m === "participacao" ? "avanco" : m)); }, [by]);
 
   const clientNames = useMemo(() => Object.fromEntries(data.clients.map(c => [c.id, c.name])), [data.clients]);
@@ -110,19 +126,27 @@ export default function Evolucao({ data, onNavigate }: Props) {
     } else { const p = new Set(pinned); p.add(k); setPinned(p); const h = new Set(hidden); h.delete(k); setHidden(h); }
   };
 
-  // Reproduzir: a "apuração" dia a dia
+  // Reproduzir: uma corrida — as linhas vão sendo desenhadas e cada um "corre" pela sua linha até o fim
   useEffect(() => {
     if (!playing) return;
-    const total = days.length;
-    const step = Math.max(120, Math.min(600, 5000 / Math.max(total, 1)));
-    const t = window.setInterval(() => setUpTo(u => { const n = (u ?? 0) + 1; if (n >= total - 1) { setPlaying(false); return null; } return n; }), step);
-    return () => window.clearInterval(t);
+    const total = Math.max(1, days.length - 1);
+    const dur = Math.max(5500, Math.min(16000, total * 900));
+    let raf = 0, done = 0; const t0 = performance.now() - (race ?? 0) / total * dur;
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / dur);
+      setRace(k * total);
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else done = window.setTimeout(() => { setPlaying(false); setRace(null); }, 1600);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); window.clearTimeout(done); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, days.length]);
-  const cut = upTo ?? days.length - 1;
+  const cut = days.length - 1;
 
   // Geometria
   const faces = by === "consultor";
-  const R = W < 640 ? 11 : 15;
+  const R = W < 640 ? 14 : 21;
   const H = W < 640 ? 320 : 440, ML = faces ? 40 + R : 40, MR = (W < 640 ? 112 : 200) + (faces ? R + 10 : 0), MT = faces ? 22 + R : 22, MB = faces ? 34 + R / 2 : 34;
   const iw = Math.max(60, W - ML - MR), ih = H - MT - MB;
   const allVals = visible.flatMap(s => s.points.slice(0, cut + 1).map(p => p.v)).filter((v): v is number => v !== null);
@@ -149,7 +173,7 @@ export default function Evolucao({ data, onNavigate }: Props) {
   if (overflow > 0) for (const l of labels) l.y -= overflow;
   for (let i = 0; i < labels.length; i++) if (labels[i].y < MT) labels[i].y = MT + i * gap;
 
-  const hi = hover !== null && hover <= cut ? hover : null;
+  const hi = hover !== null && hover <= cut && race === null ? hover : null;
   // Fotos: em todos os pontos quando há poucos dias; senão no último ponto e no dia sob o mouse
   const faceDays = new Set<number>();
   if (faces) {
@@ -157,13 +181,23 @@ export default function Evolucao({ data, onNavigate }: Props) {
     if (days.length <= 10) lines.forEach(l => l.pts.forEach(p => faceDays.add(p.i))); else if (lastIdx >= 0) faceDays.add(lastIdx);
     if (hover !== null && hover <= cut) faceDays.add(hover);
   }
+  const racing = race !== null;
+  const rx = racing ? X(race!) : 0;
+  const runners = racing ? dodge(lines.map(l => {
+    if (!l.pts.length || race! < l.pts[0].i) return null;
+    const xy = l.pts.map(p => ({ x: X(p.i), y: Y(p.v) }));
+    const y = evalSmooth(xy, rx); if (y === null) return null;
+    const v = Math.max(0, Math.round((y0 + (MT + ih - y) / ih * (y1 - y0)) * 10) / 10);
+    return { s: l.s, x: Math.min(rx, xy[xy.length - 1].x), y, v };
+  }).filter(Boolean) as { s: Series; x: number; y: number; v: number }[], faces ? 2 * R + 6 : 14, MT - R / 2, MT + ih + R / 2) : [];
+  const raceLabels = racing ? dodge([...runners].map(r => ({ ...r, y: r.ay })), gap, MT, MT + ih) : [];
   const lastFaceIdx = Math.max(-1, ...lines.map(l => l.end?.i ?? -1));
-  const faceLayers = faces ? [...faceDays].sort((a, b) => a - b).map(i => {
+  const faceLayers = faces && !racing ? [...faceDays].sort((a, b) => a - b).map(i => {
     const items = lines.map(l => { const p = l.pts.find(q => q.i === i); return p ? { s: l.s, x: X(i), y: Y(p.v) } : null; }).filter(Boolean) as { s: Series; x: number; y: number }[];
     const last = i === lastFaceIdx;
-    if (last || i === hover) return { i, last, items: dodge(items, 2 * (last ? R : R - 3) + 6, MT - R / 2, MT + ih + R / 2).map(it => ({ ...it, face: true })) };
+    if (last || i === hover) return { i, last, items: dodge(items, 2 * (last ? R : R - 5) + 6, MT - R / 2, MT + ih + R / 2).map(it => ({ ...it, face: true })) };
     // pontos do meio: foto só onde cabe sem empurrar ninguém; o resto vira bolinha simples
-    const placed: number[] = [], gapMid = 2 * (R - 3) + 5;
+    const placed: number[] = [], gapMid = 2 * (R - 5) + 5;
     const pri = [...items].sort((a, b) => (focus === a.s.key ? -1 : focus === b.s.key ? 1 : 0) || a.y - b.y);
     return { i, last, items: pri.map(it => { const ok = placed.every(y => Math.abs(y - it.y) >= gapMid); if (ok) placed.push(it.y); return { ...it, ay: it.y, face: ok }; }) };
   }) : [];
@@ -192,7 +226,7 @@ export default function Evolucao({ data, onNavigate }: Props) {
       </div>
       <div className="header-actions">
         <button className="btn ghost v4-secondary-action" onClick={() => void load()}><RefreshCw size={16} className={loading ? "spin" : ""} /> Atualizar</button>
-        <button className="btn primary v4-primary-action" onClick={() => { if (playing) { setPlaying(false); return; } setUpTo(0); setPlaying(true); }} disabled={days.length < 2}>{playing ? <><Pause size={16} /> Pausar</> : <><Play size={16} /> Reproduzir</>}</button>
+        <button className="btn primary v4-primary-action" onClick={() => { if (playing) { setPlaying(false); return; } setRaced(true); setRace(r => (r === null || r >= days.length - 1.01 ? 0 : r)); setPlaying(true); }} disabled={days.length < 2}>{playing ? <><Pause size={16} /> Pausar</> : <><Play size={16} /> Reproduzir</>}</button>
       </div>
     </div>
 
@@ -206,7 +240,7 @@ export default function Evolucao({ data, onNavigate }: Props) {
     <div className="v18-toolbar">
       <div className="v17-seg" role="group" aria-label="Ver por"><span>Ver por</span>{VIEWS.map(v => <button key={v.key} type="button" className={by === v.key ? "on" : ""} aria-pressed={by === v.key} onClick={() => setBy(v.key)}>{v.label}</button>)}</div>
       <div className="v17-seg" role="group" aria-label="Métrica"><span>Métrica</span>{METRICS.filter(m => !(m.key === "participacao" && by === "cliente")).map(m => <button key={m.key} type="button" title={m.hint} className={metric === m.key ? "on" : ""} aria-pressed={metric === m.key} onClick={() => setMetric(m.key)}>{m.label}</button>)}</div>
-      <div className="v17-seg" role="group" aria-label="Período">{PERIODS.map(p => <button key={p.d} type="button" className={period === p.d ? "on" : ""} aria-pressed={period === p.d} onClick={() => { setPeriod(p.d); setUpTo(null); setPlaying(false); }}>{p.label}</button>)}</div>
+      <div className="v17-seg" role="group" aria-label="Período">{PERIODS.map(p => <button key={p.d} type="button" className={period === p.d ? "on" : ""} aria-pressed={period === p.d} onClick={() => { setPeriod(p.d); setRace(null); setPlaying(false); }}>{p.label}</button>)}</div>
     </div>
 
     <section className="v17-panel v18-chart-panel">
@@ -219,23 +253,38 @@ export default function Evolucao({ data, onNavigate }: Props) {
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Gráfico de ${metricInfo.label}: ${visible.map(s => `${s.label} ${pct(s.last)}`).join(", ")}`}>
           <defs>
             <clipPath id="v18-round" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5" /></clipPath>
+            <clipPath id="v18-reveal"><rect x="0" y="0" width={racing ? rx + 1 : W} height={H} /></clipPath>
             {visible.map(s => <linearGradient key={s.key} id={`v18g-${s.key.replace(/[^a-z0-9]/gi, "")}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={s.color} stopOpacity=".22" /><stop offset="100%" stopColor={s.color} stopOpacity="0" /></linearGradient>)}
           </defs>
           {ticks.map(t => <g key={t}><line x1={ML} x2={ML + iw} y1={Y(t)} y2={Y(t)} className="v18-grid" /><text x={ML - 8} y={Y(t) + 4} className="v18-ytick">{t}%</text></g>)}
           {estUntil && days.indexOf(estUntil) > 0 && <g><rect x={ML} y={MT} width={X(days.indexOf(estUntil)) - ML} height={ih} className="v18-est-zone" /><text x={ML + 8} y={MT + 14} className="v18-est-label">estimado</text></g>}
           {days.map((d, i) => (i % xEvery === 0 && (days.length - 1 - i >= xEvery * .7 || i === days.length - 1)) || i === days.length - 1 ? <text key={d} x={X(i)} y={H - 10} className="v18-xtick" textAnchor={i === 0 && days.length > 1 ? "start" : i === days.length - 1 && days.length > 1 ? "end" : "middle"}>{fmtDay(d)}</text> : null)}
+          <g clipPath={racing ? "url(#v18-reveal)" : undefined}>
           {lines.map(({ s, estPath, realPath, pts, end }) => {
             const dim = focus && focus !== s.key;
             const area = focus === s.key && pts.length > 1 ? `${smooth(pts.map(p => ({ x: X(p.i), y: Y(p.v) })))} L${X(pts[pts.length - 1].i)},${MT + ih} L${X(pts[0].i)},${MT + ih} Z` : "";
             return <g key={`${s.key}-${by}-${metric}-${period}`} className={`v18-line ${dim ? "dim" : ""} ${focus === s.key ? "focus" : ""}`} onMouseEnter={() => setFocus(s.key)} onMouseLeave={() => setFocus(null)}>
               {area && <path d={area} fill={`url(#v18g-${s.key.replace(/[^a-z0-9]/gi, "")})`} />}
               {estPath && <path d={estPath} fill="none" stroke={s.color} strokeWidth="2.4" strokeDasharray="5 6" strokeLinecap="round" opacity=".7" />}
-              {realPath && <path d={realPath} fill="none" stroke={s.color} strokeWidth={focus === s.key ? 4 : 3} strokeLinecap="round" strokeLinejoin="round" pathLength={upTo === null ? 1 : undefined} className={upTo === null ? "v18-draw" : ""} />}
+              {realPath && <path d={realPath} fill="none" stroke={s.color} strokeWidth={focus === s.key ? 4 : 3} strokeLinecap="round" strokeLinejoin="round" pathLength={!raced ? 1 : undefined} className={!raced ? "v18-draw" : ""} />}
               {days.length <= 45 && pts.filter(p => !(faces && faceDays.has(p.i))).map(p => <circle key={p.i} cx={X(p.i)} cy={Y(p.v)} r={2.6} fill="#fff" stroke={s.color} strokeWidth="2" />)}
-              {end && !faces && <><circle cx={X(end.i)} cy={Y(end.v)} r="9" fill={s.color} opacity=".18" className="v18-pulse" /><circle cx={X(end.i)} cy={Y(end.v)} r="5" fill={s.color} stroke="#fff" strokeWidth="2" /></>}
+              {end && !faces && !racing && <><circle cx={X(end.i)} cy={Y(end.v)} r="9" fill={s.color} opacity=".18" className="v18-pulse" /><circle cx={X(end.i)} cy={Y(end.v)} r="5" fill={s.color} stroke="#fff" strokeWidth="2" /></>}
             </g>;
           })}
-          {labels.map(({ key, y, l }) => {
+          </g>
+          {racing && <g className="v18-race">
+            <line x1={rx} x2={rx} y1={MT} y2={MT + ih} className="v18-race-line" />
+            {runners.map(r => <g key={r.s.key}>
+              {Math.abs(r.ay - r.y) > 2 && <line x1={r.x} y1={r.y} x2={r.x} y2={r.ay} stroke={r.s.color} strokeWidth="1.5" strokeDasharray="2 3" />}
+              {faces ? <><circle cx={r.x} cy={r.ay} r={R + 7} fill={r.s.color} opacity=".18" /><Face x={r.x} y={r.ay} r={R} s={r.s} ring={3.5} /></>
+                : <><circle cx={r.x} cy={r.y} r="11" fill={r.s.color} opacity=".22" /><circle cx={r.x} cy={r.y} r="6" fill={r.s.color} stroke="#fff" strokeWidth="2.5" /></>}
+            </g>)}
+            {raceLabels.map(r => { const x = ML + iw + 14 + (faces ? R + 8 : 0); const pos = [...runners].sort((a, b) => b.v - a.v).findIndex(q => q.s.key === r.s.key) + 1;
+              return <g key={r.s.key} className="v18-race-lab" style={{ transform: `translate(${x}px, ${r.ay}px)` }}>
+                <text x={0} y={4} className="v18-lab"><tspan className="v18-race-pos">{pos}º</tspan><tspan dx="6" fill={r.s.color} className="v18-lab-v">{pct(r.v)}</tspan><tspan dx="6" className="v18-lab-n">{r.s.label.length > (W < 640 ? 8 : 16) ? `${r.s.label.slice(0, W < 640 ? 7 : 15)}…` : r.s.label}</tspan></text>
+              </g>; })}
+          </g>}
+          {!racing && labels.map(({ key, y, l }) => {
             const s = l.s, dim = focus && focus !== key, x = ML + iw + 14 + (faces ? R + 8 : 0);
             return <g key={key} className={`v18-endlabel ${dim ? "dim" : ""}`} onMouseEnter={() => setFocus(key)} onMouseLeave={() => setFocus(null)}>
               {!faces && <line x1={X(l.end!.i) + 6} y1={Y(l.end!.v)} x2={x - 4} y2={y} stroke={s.color} strokeWidth="1" opacity=".5" />}
@@ -246,7 +295,7 @@ export default function Evolucao({ data, onNavigate }: Props) {
             {layer.items.map(it => !it.face ? <circle key={it.s.key} cx={it.x} cy={it.y} r="4" fill="#fff" stroke={it.s.color} strokeWidth="2.4" className={`v18-endlabel ${focus && focus !== it.s.key ? "dim" : ""}`} /> : <g key={it.s.key} className={`v18-endlabel ${focus && focus !== it.s.key ? "dim" : ""}`} onMouseEnter={() => setFocus(it.s.key)} onMouseLeave={() => setFocus(null)}>
               {Math.abs(it.ay - it.y) > 2 && <><line x1={it.x} y1={it.y} x2={it.x} y2={it.ay} stroke={it.s.color} strokeWidth="1.5" strokeDasharray="2 3" /><circle cx={it.x} cy={it.y} r="3" fill={it.s.color} /></>}
               {layer.last && <circle cx={it.x} cy={it.ay} r={R + 8} fill={it.s.color} opacity=".16" className="v18-pulse" />}
-              <Face x={it.x} y={it.ay} r={layer.last ? R : R - 3} s={it.s} ring={layer.last ? 3 : 2} />
+              <Face x={it.x} y={it.ay} r={layer.last ? R : R - 5} s={it.s} ring={layer.last ? 3.5 : 2.5} />
             </g>)}
           </g>)}
           {hi !== null && <g className="v18-cross"><line x1={X(hi)} x2={X(hi)} y1={MT} y2={MT + ih} />{!faces && tip.map(t => <circle key={t.s.key} cx={X(hi)} cy={Y(t.p.v as number)} r="5.5" fill={t.s.color} stroke="#fff" strokeWidth="2.5" />)}</g>}
@@ -258,7 +307,7 @@ export default function Evolucao({ data, onNavigate }: Props) {
             return <div key={t.s.key} className="row"><span className="pos">{i + 1}</span>{faces && avatarUrl(t.s.label) ? <img className="v18-tip-face" src={avatarUrl(t.s.label)!} alt="" style={{ borderColor: t.s.color }} /> : <i style={{ background: t.s.color }} />}<span className="nm">{t.s.label}</span><span className="v">{pct(t.p.v)}</span><span className={`d ${d === null || d === 0 ? "eq" : d > 0 ? "up" : "dn"}`}>{d === null || d === 0 ? "=" : signed(d)}</span></div>; })}
           {tip.length > 10 && <small>+{tip.length - 10}</small>}
         </div>}
-        {upTo !== null && days[cut] && <div className="v18-replay-day">{fmtLong(days[cut])}</div>}
+        {racing && <div className="v18-replay-day">{fmtLong(days[Math.min(days.length - 1, Math.round(race!))])}</div>}
       </div>
 
       <div className="v18-legend">
