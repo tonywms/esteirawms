@@ -3,7 +3,7 @@
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, Copy, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, GitBranch, Hand, ListChecks, MessageSquare, MessageSquarePlus, PenLine, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
+import { AlertTriangle, Flame, ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleDot, Clock3, Copy, ExternalLink, Eye, FileCheck2, FileClock, FileMinus2, FileText, FileX2, Flag, GitBranch, Hand, ListChecks, MessageSquare, MessageSquarePlus, PenLine, Monitor, Paperclip, RefreshCw, Search, Send, ShieldCheck, Ban, Megaphone, SkipForward, Target, Timer, Upload, UserRound, Wrench, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
 import { BALL, PHASES, ballOf, canMove, docOf, docResolved, docStates, flowSummary, healthLabel, healthOf, movePhasePatch, phaseIndex, phaseOf, phaseOwner, phaseSince, type DocState, type Health, type PhaseKey } from "@/lib/flow";
 import type { PhaseDoc } from "@/lib/types";
@@ -88,7 +88,7 @@ export default function FlowBoard({ data, onRefresh, onEdit, onOpen }: Props) {
         <div className="v7-corner">ONDA / FASE</div>
         {PHASES.map((ph, i) => {
           const n = visible.filter(r => r.phase === ph.key).length;
-          return <div key={ph.key} className={`v7-phase-head ${i === 0 ? "first" : ""} ${ph.key === "fim" ? "last" : ""}`}><span className="v7-step">{i + 1}</span><div><strong>{ph.short}</strong><small>{n} projeto{n === 1 ? "" : "s"}</small></div></div>;
+          return <div key={ph.key} className={`v7-phase-head ${i === 0 ? "first" : ""} ${ph.key === "fim" ? "last" : ""}`}><span className="v7-step">{i + 1}</span><div><strong>{ph.short}</strong><small>{n} projeto{n === 1 ? "" : "s"}</small></div>{ph.key !== "fim" && <a className="v17-phase-heat" href={`/gargalos?fase=${ph.key}`} title={`Ver gargalos de ${ph.short}`} aria-label={`Ver gargalos de ${ph.short}`}><Flame size={13} /></a>}</div>;
         })}
         {lanes.map(lane => <FragmentLane key={lane} lane={lane} data={data} rows={visible.filter(r => laneOf(r.p) === lane)} onPick={id => setSelected(id)} />)}
       </div>

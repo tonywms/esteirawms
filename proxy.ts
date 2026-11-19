@@ -44,7 +44,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(login);
   }
   if (s.r === "tv") {
-    const ok = req.method === "GET" && (pathname === "/tv" || pathname === "/api/state");
+    const ok = req.method === "GET" && (pathname === "/tv" || pathname === "/api/state" || pathname === "/api/evolucao" || pathname.startsWith("/api/avatar/"));
     if (ok) return NextResponse.next();
     return isApi ? NextResponse.json({ error: "Link da TV: somente leitura." }, { status: 403 }) : NextResponse.redirect(new URL("/tv", req.url));
   }

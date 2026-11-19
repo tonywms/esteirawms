@@ -13,6 +13,10 @@ import { canSeePath, canWriteEntity, homeFor, type Profile } from "@/lib/permiss
 import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOwner,summary,todayISO,weeklySlots,weekStart} from "@/lib/metrics";
 import TaskAttachments from "./TaskAttachments";
 import MobileNav from "./MobileNav";
+import Gargalos from "./Gargalos";
+import { Flame } from "lucide-react"; /* WMS_ESTEIRA_V17 */
+import Evolucao from "./Evolucao";
+import { TrendingUp as TrendingUpV18 } from "lucide-react"; /* WMS_ESTEIRA_V18 */
 import PageSkeleton from "./PageSkeleton"; /* WMS_ESTEIRA_V16 */
 import DateField from "./DateField";
 import { friendly } from "@/lib/friendly"; /* WMS_ESTEIRA_V14 */
@@ -32,6 +36,8 @@ type FieldKey=string;
 const paths=[
  {path:"/",label:"Painel executivo",icon:LayoutDashboard,group:"Gestão estratégica"},
  {path:"/esteira",label:"Esteira por ondas",icon:Waves,group:"Gestão estratégica"},
+ {path:"/gargalos",label:"Mapa de gargalos",icon:Flame,group:"Gestão estratégica"},
+ {path:"/evolucao",label:"Evolução da esteira",icon:TrendingUpV18,group:"Gestão estratégica"},
  {path:"/clientes",label:"Clientes",icon:Users,group:"Operação"},
  {path:"/projetos",label:"Projetos",icon:Layers3,group:"Operação"},
  {path:"/atividades",label:"Atividades & SLA",icon:ListTodo,group:"Operação"},
@@ -308,7 +314,7 @@ export default function ControlTower(){
  const content=()=>{
   if(parts[0]==="clientes"&&parts[1]){const c=data.clients.find(c=>c.id===parts[1]);return c?ClientDetail({client:c}):<Empty title="Cliente não encontrado"/>}
   if(parts[0]==="projetos"&&parts[1]){const p=data.projects.find(p=>p.id===parts[1]);return p?ProjectDetail({project:p}):<Empty title="Projeto não encontrado"/>}
-  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
+  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
  };
  const formInput=(key:FieldKey,label:string,opts:{type?:string;options?:string[];placeholder?:string;required?:boolean;multiline?:boolean;span?:boolean;custom?:ReactNode}={})=>{
   const value=form[key];const change=(x:unknown)=>setForm(f=>({...f,[key]:x}));

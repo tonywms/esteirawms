@@ -183,3 +183,11 @@ export async function sbUploadBytes(uploadUrl: string, apikey: string, bytes: Ui
   const res = await fetch(uploadUrl, { method: "POST", headers: { apikey, Authorization: `Bearer ${apikey}`, "Content-Type": contentType, "x-upsert": "false" }, body: Buffer.from(bytes) });
   if (!res.ok) throw new Error(`Falha ao guardar o arquivo (${res.status}).`);
 }
+
+/* V18 · Evolução da esteira: fotos diárias */
+export async function sbSnapshotSave(day: string, rows: Row[]) {
+  return rpc<number>("esteira_snapshot_save", { p_key: appKey(), p_day: day, p_rows: rows });
+}
+export async function sbSnapshotsLoad(since: string) {
+  return rpc<Row[]>("esteira_snapshots_load", { p_key: appKey(), p_since: since });
+}

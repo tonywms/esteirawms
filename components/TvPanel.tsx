@@ -1,16 +1,17 @@
 "use client";
 // V7/V8.1 · Painel de TV: tela cheia, leitura à distância, atualiza a cada 30s e alterna 3 visões a cada 20s:
-// Esteira por fases · Destravar a onda (PDFs) · Gargalos, go-lives e agenda.
+// Esteira por fases · Destravar a onda (PDFs) · Gargalos, go-lives e agenda · Mapa de gargalos (V17).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, FileX2, Hand, LockKeyhole, Maximize2, Rocket, Timer, TrendingUp, Unlock, Users } from "lucide-react";
 import type { State } from "@/lib/types";
 import { PHASES, ballOf, docStates, flowSummary, phaseIndex, phaseOwner, unlockSummary, type Health } from "@/lib/flow";
 import { fmtDate, todayISO } from "@/lib/metrics";
+import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
 const empty: State = { version: 1, importedAt: "", sourceFile: "", clients: [], projects: [], tasks: [], appointments: [], staff: [], users: [], audit: [] };
 const order: Record<Health, number> = { red: 0, amber: 1, green: 2, done: 3 };
-const VIEWS = ["Esteira por fases", "Destravar a onda", "Gargalos, go-lives e agenda"];
+const VIEWS = ["Esteira por fases", "Destravar a onda", "Gargalos, go-lives e agenda", "Mapa de gargalos"];
 const N = VIEWS.length;
 
 export default function TvPanel() {
@@ -24,6 +25,9 @@ export default function TvPanel() {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") setView(v => (v + 1) % N); if (e.key === "f") void document.documentElement.requestFullscreen?.(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
   const s = useMemo(() => flowSummary(data), [data]);
   const u = useMemo(() => unlockSummary(data), [data]);
+  const hm = useMemo(() => heatmap(data, "fase"), [data]);
+  const gs = useMemo(() => gargalosSummary(data), [data]);
+  const atk = useMemo(() => attackFirst(hm.heats, 5), [hm.heats]);
   const name = (id: string) => data.clients.find(c => c.id === id)?.name || "Cliente";
   const today = todayISO();
   const agenda = data.appointments.filter(a => a.date === today && a.status !== "Cancelado").sort((a, b) => a.consultant.localeCompare(b.consultant));
@@ -78,6 +82,20 @@ export default function TvPanel() {
             {!u.owners.length && <div className="ok"><CheckCircle2 /> Nenhum documento pendente</div>}</div>
           <p className="v8-legend">K endereçamento · D integração · H homologação · I implantação · G go-live</p>
         </div>
+      </div>
+    </section> : view === 3 ? <section className="v17-tv">
+      <div className="panel-tv v17-tv-heat">
+        <h3><AlertTriangle /> Onde a esteira está travando <em>{gs.pctInGoal === null ? "—" : `${gs.pctInGoal}% na meta`}</em></h3>
+        <div className="v17-tv-grid" style={{ gridTemplateColumns: `minmax(0,1.3fr) repeat(${DIMS.length}, minmax(0,1fr))` }}>
+          <span />{DIMS.map(d => <span key={d.key} className="h">{d.label}</span>)}
+          {hm.rows.map(r => <div key={r.key} style={{ display: "contents" }}><span className="r"><b>{r.label}</b><small>{r.total} proj.</small></span>
+            {DIMS.map(d => { const c = r.cells[d.key]; return <span key={d.key} className={`c l${c.level}`}><b>{c.text}</b><small>{c.sub}</small></span>; })}</div>)}
+        </div>
+      </div>
+      <div className="panel-tv">
+        <h3><Rocket /> Atacar primeiro <em>{atk.length}</em></h3>
+        <div className="rows">{atk.map((a, i) => <div key={a.h.p.id} className={`row ${i < 2 ? "red" : "amber"}`}><i /><div><strong>{i + 1}. {a.h.client}</strong><small>{a.problem}</small></div></div>)}
+          {!atk.length && <div className="ok"><CheckCircle2 /> Nenhum gargalo agora</div>}</div>
       </div>
     </section> : <section className="v7-tv-split">
       <div className="panel-tv">

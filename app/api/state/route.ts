@@ -1,10 +1,12 @@
 import { loadState } from "@/lib/storage";
+import { recordSnapshot } from "@/lib/evolucao-store";
 import { COOKIE, authEnabled, readSession } from "@/lib/auth";
 import { asProfile, canManageUsers } from "@/lib/permissions";
 export const runtime="nodejs";export const dynamic="force-dynamic";
 // V7.6: a lista de usuarios (e-mails/perfis) so vai para Administradores e Gestores
 export async function GET(req:Request){try{
  const state=await loadState();
+ void recordSnapshot(state).catch(e=>console.error("[esteira] foto do dia",e)); // V18: foto diaria para a Evolucao
  if(authEnabled()){
   const raw=req.headers.get("cookie")?.split(/;\s*/).find(c=>c.startsWith(COOKIE+"="))?.slice(COOKIE.length+1);
   const s=await readSession(raw);const p=asProfile(s?.p);
