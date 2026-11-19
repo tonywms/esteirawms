@@ -19,7 +19,7 @@ async function zs<T>(path: string, init?: RequestInit): Promise<T> {
   if (!zapsignConfigured()) throw new Error("A integração com a ZapSign ainda não foi configurada (ZAPSIGN_TOKEN).");
   const r = await fetch(`${base()}${path}`, { ...init, cache: "no-store", headers: { Authorization: `Bearer ${env("ZAPSIGN_TOKEN")}`, "Content-Type": "application/json", ...(init?.headers || {}) } });
   const j = await r.json().catch(() => ({})) as T & { detail?: string; message?: string; error?: string };
-  if (!r.ok) throw new Error(`ZapSign: ${j.detail || j.message || j.error || r.status}`);
+  if (!r.ok) throw new Error(`ZapSign: ${r.status}${j.detail || j.message || j.error ? ` · ${j.detail || j.message || j.error}` : ""}`);
   return j;
 }
 

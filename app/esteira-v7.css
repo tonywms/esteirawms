@@ -1297,3 +1297,7 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v22-item .act { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 @media (max-width: 1100px) { .v22-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 800px) { .v22-item header { flex-wrap: wrap; } .v22-item .v22-meta { width: 100%; padding-left: 42px; } .v22-item .v22-body { padding-left: 14px; } }
+/* V22.3 · liberação pelo usuário logado (master/liberador) */
+.v22-trusted { display: block; line-height: 1.45; padding: 10px 12px; border-radius: 12px; background: #eef9f2; color: #1e6b3a; font-size: 12.5px; font-weight: 650; border: 1px solid #c4ead2; }
+.btn.primary.v22-free { background: linear-gradient(135deg, #7c5cf0, #5b3fd6) !important; border-color: #6a4de3 !important; }
+.v22-trusted svg { vertical-align: -3px; margin-right: 6px; }

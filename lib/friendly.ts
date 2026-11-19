@@ -10,6 +10,8 @@ const RULES: [RegExp, string][] = [
   [/duplicate key|already exists|unique constraint/i, "Já existe um registro com esses dados."],
   [/foreign key/i, "Este registro está ligado a outros e não pode ser alterado assim."],
   [/row-level security|permission denied|not authorized|unauthorized|\b401\b|\b403\b/i, "Sem permissão para esta ação. Entre de novo ou fale com o administrador."],
+  [/zapsign:?\s*402|payment required/i, "A ZapSign recusou o envio por falta de plano de API ou de créditos de documentos (erro 402). Verifique o plano da conta em app.zapsign.com.br › Planos e preços."],
+  [/zapsign:?\s*429|too many requests/i, "A ZapSign limitou as chamadas por excesso de envios. Aguarde um minuto e tente de novo."],
   [/zapsign.*(token|autentica)/i, "A ZapSign recusou o token configurado. Peça ao administrador para reconfigurar a integração (-ConfigurarZapSign)."],
   [/smtp|invalid login|535|username and password not accepted|auth.*fail/i, "O servidor de e-mail recusou o usuário ou a senha configurados. Peça ao administrador para rodar -ConfigurarEmail."],
   [/unexpected token|json/i, "O servidor respondeu de um jeito inesperado. Recarregue a página e tente de novo."],

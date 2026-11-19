@@ -1,7 +1,7 @@
 import { COOKIE, authEnabled, readSession, roleFromProfile, safeEqual, signSession, teamPassword } from "@/lib/auth";
 import { sbAuth, supabaseConfigured } from "@/lib/supabase-store";
 import { asProfile, homeFor, type Profile } from "@/lib/permissions";
-import { isMasterEmail } from "@/lib/master"; // V22: master vê os erros do sistema
+import { isMasterEmail, isReleaserEmail } from "@/lib/master"; // V22: master vê os erros do sistema
 export const runtime = "nodejs";
 const attempts = new Map<string, { n: number; until: number }>();
 const cookie = (v: string, maxAge: number) => `${COOKIE}=${v}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
@@ -10,7 +10,7 @@ const cookie = (v: string, maxAge: number) => `${COOKIE}=${v}; Path=/; HttpOnly;
 export async function GET(req: Request) {
   const raw = req.headers.get("cookie")?.split(/;\s*/).find(c => c.startsWith(COOKIE + "="))?.slice(COOKIE.length + 1);
   const s = await readSession(raw);
-  return Response.json(s ? { name: s.n || "", email: s.e || "", role: s.r, profile: asProfile(s.p), master: isMasterEmail(s.e) } : { name: "", role: authEnabled() ? null : "local", profile: null, master: !authEnabled() }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json(s ? { name: s.n || "", email: s.e || "", role: s.r, profile: asProfile(s.p), master: isMasterEmail(s.e), releaser: isReleaserEmail(s.e) } : { name: "", role: authEnabled() ? null : "local", profile: null, master: !authEnabled(), releaser: !authEnabled() }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: Request) {
