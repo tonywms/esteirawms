@@ -43,6 +43,34 @@ export async function zsCreate(o: { name: string; urlPdf: string; externalId: st
 }
 export const zsDetail = (token: string) => zs<ZsDoc>(`/api/v1/docs/${encodeURIComponent(token)}/`);
 
+/** V21 · Pessoas que já receberam documentos na ZapSign (a API não expõe a agenda de contatos;
+ *  lemos os documentos com os signatários). Cache de 10 minutos por servidor. */
+type ZsListSigner = { name?: string; email?: string | null; phone_country?: string | null; phone_number?: string | null; phone?: string | null };
+type ZsListDoc = { name?: string; created_at?: string; last_update_at?: string; signers?: ZsListSigner[] };
+let peopleCache: { at: number; people: import("./contacts").ZsPerson[] } | null = null;
+export async function zsPeople(force = false) {
+  if (!force && peopleCache && Date.now() - peopleCache.at < 10 * 60 * 1000) return { people: peopleCache.people, cached: true };
+  const map = new Map<string, import("./contacts").ZsPerson>();
+  for (let page = 1; page <= 40; page++) {
+    const j = await zs<{ next?: string | null; results?: ZsListDoc[] }>(`/api/v1/docs/?page=${page}&include_signers=true&sort_order=desc`);
+    for (const d of j.results || []) for (const sg of d.signers || []) {
+      const name = String(sg.name || "").trim(); if (!name) continue;
+      const email = String(sg.email || "").trim().toLowerCase();
+      const raw = String(sg.phone_number || sg.phone || "").replace(/\D/g, "");
+      const phone = raw ? (sg.phone_country && sg.phone_country !== "55" ? `+${sg.phone_country}${raw}` : raw) : "";
+      const key = email || (phone ? `tel:${phone}` : `nome:${name.toLowerCase()}`);
+      const at = String(d.last_update_at || d.created_at || "");
+      const cur = map.get(key);
+      if (cur) { cur.docs++; if (at > cur.lastAt) cur.lastAt = at; if (!cur.phone && phone) cur.phone = phone; if (d.name && cur.docNames.length < 5 && !cur.docNames.includes(d.name)) cur.docNames.push(d.name); }
+      else map.set(key, { name, email, phone, docs: 1, lastAt: at, docNames: d.name ? [d.name] : [] });
+    }
+    if (!j.next) break;
+  }
+  const people = [...map.values()].sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
+  peopleCache = { at: Date.now(), people };
+  return { people, cached: false };
+}
+
 export const signFromDoc = (d: ZsDoc, prev?: Partial<SignRequest>): SignRequest => ({
   provider: "zapsign", docToken: d.token, fileName: prev?.fileName || d.name, originalPath: prev?.originalPath, sentAt: prev?.sentAt || new Date().toISOString(), sentBy: prev?.sentBy,
   status: d.status === "signed" ? "signed" : d.status === "refused" || d.signers.some(s => s.status === "refused") ? "refused" : "pending",

@@ -12,6 +12,7 @@ function apiAllowed(p: Profile, path: string, method: string): string | null {
   if (path.startsWith("/api/docs/extra")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode alterar documentos.`; // V20
   if (path.startsWith("/api/docs/upload")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode anexar documentos.`;
   if (path.startsWith("/api/docs/view")) return p === "Painel" ? "Perfil Painel: somente a TV." : null;
+  if (path.startsWith("/api/zapsign/contacts")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "clients", "PATCH") || canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode consultar contatos.`; // V21
   if (path.startsWith("/api/zapsign/send") || path.startsWith("/api/zapsign/sync")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode enviar documentos para assinatura.`;
   if (path.startsWith("/api/tasks/attachments")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "tasks", "PATCH") ? null : `Seu perfil (${p}) não pode anexar arquivos.`;
   if (path.startsWith("/api/flow/override") || path.startsWith("/api/escalate") || path.startsWith("/api/report")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode executar esta ação.`;
