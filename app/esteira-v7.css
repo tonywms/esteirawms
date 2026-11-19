@@ -1247,3 +1247,4 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v21-zp-row .tags em.warn { background: #fff4dc; color: #8a5a00; } .v21-zp-row .tags em.ok { background: #e3f6ea; color: #1e6b3a; }
 @media (max-width: 640px) { .v21-zp-row { grid-template-columns: 18px minmax(0, 1fr); } .v21-zp-row .tags { grid-column: 2; align-items: flex-start; max-width: none; } }
 .v21-zp-tools .v11-toggle { width: auto; flex: none; }
+.v21-zsinfo { padding: 6px 10px 2px; font-size: 11px; font-weight: 700; color: #8a9bab; }

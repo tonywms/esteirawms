@@ -27,9 +27,10 @@ export default function SignDialog({ target, onClose, onDone }: { target: SignTa
   // V21 · busca de contatos (este cliente, outros clientes e ZapSign), aviso de duplicado e "salvar no cadastro"
   const [clientId, setClientId] = useState(cl?.id || ""), [allClients, setAllClients] = useState<Client[] | null>(null), [zsList, setZsList] = useState<ZsPerson[] | null>(null);
   const [q, setQ] = useState(""), [searchOpen, setSearchOpen] = useState(false);
+  const [zsInfo, setZsInfo] = useState<{ docs: number; people: number; error?: string } | null>(null);
   function loadDirectory() {
     if (allClients === null) fetch("/api/records/clients", { cache: "no-store" }).then(r => (r.ok ? r.json() : [])).then(setAllClients).catch(() => setAllClients([]));
-    if (zsList === null) fetch("/api/zapsign/contacts", { cache: "no-store" }).then(r => r.json()).then(j => setZsList(j.people || [])).catch(() => setZsList([]));
+    if (zsList === null) fetch("/api/zapsign/contacts", { cache: "no-store" }).then(async r => { const j = await r.json().catch(() => ({})); setZsList(j.people || []); setZsInfo({ docs: j.info?.docs ?? 0, people: (j.people || []).length, error: !r.ok ? j.error || "Falha ao consultar a ZapSign" : j.configured === false ? "ZapSign não configurada" : undefined }); }).catch(() => { setZsList([]); setZsInfo({ docs: 0, people: 0, error: "Falha ao consultar a ZapSign" }); });
   }
   const [extra, setExtra] = useState<Person[]>([]), [message, setMessage] = useState(""), [whatsapp, setWhatsapp] = useState(false);
   const [file, setFile] = useState<File | null>(null), [busy, setBusy] = useState(false), [pct, setPct] = useState(0), [error, setError] = useState("");
@@ -56,8 +57,10 @@ export default function SignDialog({ target, onClose, onDone }: { target: SignTa
 
   const pool = (): Client[] => { const base = (allClients || []).filter(c => c.id !== clientId); return [...base, { id: clientId || "_atual", name: clientName || "este cliente", system: "", notes: "", createdAt: "", updatedAt: "", signers: contacts }]; };
   const hits = (): Hit[] => {
-    const t = q.trim().toLowerCase(); if (t.length < 2) return [];
-    const m = (x: { name: string; email?: string; phone?: string }) => `${x.name} ${x.email || ""} ${x.phone || ""} ${normPhone(x.phone)}`.toLowerCase().includes(t);
+    const flat = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const t = flat(q.trim()); if (t.length < 2) return [];
+    const tt = t.replace(/[\s.()-]/g, "");
+    const m = (x: { name: string; email?: string; phone?: string }) => { const hay = flat(`${x.name} ${x.email || ""} ${x.phone || ""} ${normPhone(x.phone)}`); return hay.includes(t) || (tt.length >= 3 && hay.replace(/[\s.()-]/g, "").includes(tt)); };
     const out: Hit[] = [], seen = new Set<string>();
     const push = (h: Hit) => { const k = normEmail(h.email) || normPhone(h.phone) || h.name.toLowerCase(); if (seen.has(k)) return; seen.add(k); out.push(h); };
     contacts.filter(m).forEach(c => push({ key: `c:${c.id}`, name: c.name, email: c.email, phone: c.phone || "", src: "contato", where: clientName || "este cliente", signerId: c.id }));
@@ -135,7 +138,8 @@ export default function SignDialog({ target, onClose, onDone }: { target: SignTa
             <label className="v21-search"><Search size={15} /><input value={q} onFocus={() => { loadDirectory(); setSearchOpen(true); }} onBlur={() => window.setTimeout(() => setSearchOpen(false), 160)} onChange={e => { setQ(e.target.value); setSearchOpen(true); }} placeholder="Digite nome, e-mail ou celular" disabled={busy} /></label>
             {searchOpen && q.trim().length >= 2 && <div className="v21-hits">{hits().length ? hits().map(h => <button type="button" key={h.key} onMouseDown={e => e.preventDefault()} onClick={() => pickHit(h)}>
                 {h.src === "zapsign" ? <Cloud size={15} /> : <UserRound size={15} />}<span><b>{h.name}</b><small>{[h.email, fmtPhone(h.phone)].filter(Boolean).join(" · ")}</small></span><em className={`src-${h.src}`}>{h.src === "contato" ? "deste cliente" : h.where}</em></button>)
-              : <div className="v21-nohit">{allClients === null || zsList === null ? <><RefreshCw size={13} className="spin" /> Procurando…</> : <>Ninguém encontrado. Use “Incluir outra pessoa” abaixo.</>}</div>}</div>}
+              : <div className="v21-nohit">{allClients === null || zsList === null ? <><RefreshCw size={13} className="spin" /> Procurando…</> : <>Ninguém encontrado. Use “Incluir outra pessoa” abaixo.</>}</div>}
+              {zsInfo && <div className="v21-zsinfo">{zsInfo.error ? `ZapSign: ${zsInfo.error}` : `ZapSign: ${zsInfo.docs} documento${zsInfo.docs === 1 ? "" : "s"} lidos · ${zsInfo.people} pessoa${zsInfo.people === 1 ? "" : "s"}`}</div>}</div>}
           </div>
           <div className="v9-field"><span>Quem assina pelo cliente</span>
             <div className="v9-people">{contacts.map(c => { const on = picked.includes(c.id); return <button type="button" key={c.id} className={on ? "on" : ""} disabled={busy} onClick={() => setPicked(v => (on ? v.filter(x => x !== c.id) : [...v, c.id]))}>

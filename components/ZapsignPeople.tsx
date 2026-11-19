@@ -9,9 +9,11 @@ import { dupText, findDup, fmtPhone, newSignerId, normEmail, normPhone, suggestC
 
 type Props = { clientId?: string; clientName?: string; clients: Client[]; current: ClientSigner[]; onImport: (add: ClientSigner[]) => void; onClose: () => void };
 const keyOf = (p: ZsPerson) => p.email || `tel:${p.phone}` || p.name;
+const flat = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 export default function ZapsignPeople({ clientId, clientName, clients, current, onImport, onClose }: Props) {
   const [people, setPeople] = useState<ZsPerson[] | null>(null), [error, setError] = useState(""), [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState<{ docs: number; withSigners: number; details: number; signers: number } | null>(null);
   const [q, setQ] = useState(""), [picked, setPicked] = useState<Set<string>>(new Set()), [onlySug, setOnlySug] = useState(true), [mounted, setMounted] = useState(false);
   async function load(force = false) {
     setBusy(true); setError("");
@@ -19,7 +21,7 @@ export default function ZapsignPeople({ clientId, clientName, clients, current, 
       const r = await fetch(`/api/zapsign/contacts${force ? "?atualizar=1" : ""}`, { cache: "no-store" }); const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Falha ao consultar a ZapSign.");
       if (!j.configured) throw new Error("A ZapSign ainda não foi configurada. Rode o instalador com -ConfigurarZapSign.");
-      setPeople(j.people || []);
+      setPeople(j.people || []); setInfo(j.info || null);
     } catch (e) { setError(e instanceof Error ? e.message : "Falha ao consultar a ZapSign."); setPeople([]); } finally { setBusy(false); }
   }
   useEffect(() => { setMounted(true); void load(); const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", esc); return () => window.removeEventListener("keydown", esc); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -32,7 +34,7 @@ export default function ZapsignPeople({ clientId, clientName, clients, current, 
     return { p, sug, dup, mine: !!sug && sug.id === clientId };
   }).sort((a, b) => Number(b.mine) - Number(a.mine)), [people, clients, pool, clientId]);
   const sugCount = rows.filter(r => r.mine).length;
-  const list = rows.filter(r => (!onlySug || r.mine || !sugCount) && (!q || `${r.p.name} ${r.p.email} ${r.p.phone} ${r.p.docNames.join(" ")}`.toLowerCase().includes(q.toLowerCase())));
+  const list = rows.filter(r => (!onlySug || r.mine || !sugCount) && (!q || flat(`${r.p.name} ${r.p.email} ${r.p.phone} ${r.p.docNames.join(" ")}`).replace(/\s/g, "").includes(flat(q).replace(/\s/g, ""))));
   const toggle = (k: string) => setPicked(s => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   function importNow() {
     const add: ClientSigner[] = [];
@@ -63,6 +65,7 @@ export default function ZapsignPeople({ clientId, clientName, clients, current, 
                 <i>{p.docs} documento{p.docs > 1 ? "s" : ""}{p.docNames[0] ? ` · ${p.docNames[0]}` : ""}</i></span>
               <span className="tags">{mine && <em className="sug"><Sparkles size={11} /> sugerido</em>}{!mine && sug && <em>{sug.name}?</em>}{dup && <em className={here ? "ok" : "warn"}>{here ? "já está neste cliente" : dupText(dup, clientId)}</em>}</span>
             </button>; }) : <div className="v9-empty"><Info size={15} /> {q ? "Ninguém encontrado com essa busca." : "Nenhuma pessoa encontrada nos documentos da ZapSign."}</div>}</div>}
+        {info && <div className="v21-zsinfo">Li {info.docs} documento{info.docs === 1 ? "" : "s"} da ZapSign{info.details ? ` (${info.details} pelo detalhe)` : ""} · {info.signers} assinatura{info.signers === 1 ? "" : "s"} · {(people || []).length} pessoa{(people || []).length === 1 ? "" : "s"} diferentes</div>}
         <div className="p6-confirm-note"><Info size={15} /><span>A API da ZapSign não libera a agenda de contatos; aqui aparecem as pessoas dos seus documentos. Contatos que nunca receberam documento você cadastra direto no sistema.</span></div>
       </div>
       <div className="p6-confirm-actions">
