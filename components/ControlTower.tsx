@@ -13,6 +13,9 @@ import { canSeePath, canWriteEntity, homeFor, type Profile } from "@/lib/permiss
 import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOwner,summary,todayISO,weeklySlots,weekStart} from "@/lib/metrics";
 import TaskAttachments from "./TaskAttachments";
 import MobileNav from "./MobileNav";
+import ErrorReporter from "./ErrorReporter";
+import ErrorLog from "./ErrorLog";
+import { Bug as BugV22 } from "lucide-react"; /* WMS_ESTEIRA_V22 */
 import Gargalos from "./Gargalos";
 import { Flame } from "lucide-react"; /* WMS_ESTEIRA_V17 */
 import Evolucao from "./Evolucao";
@@ -47,7 +50,7 @@ const paths=[
  {path:"/implantacao",label:"Implantação",icon:Warehouse,group:"Esteiras"},
  {path:"/agenda",label:"Agenda consultores",icon:CalendarDays,group:"Recursos"},
  {path:"/equipe",label:"Equipe & capacidade",icon:Users,group:"Recursos"},
- {path:"/relatorios",label:"Relatórios",icon:BarChart3,group:"Inteligência"},
+ {path:"/relatorios",label:"Relatórios",icon:BarChart3,group:"Inteligência"},{path:"/erros",label:"Erros do sistema",icon:BugV22,group:"Inteligência"},
  {path:"/configuracoes",label:"Configurações",icon:Settings2,group:"Inteligência"},
  {path:"/usuarios",label:"Usuários",icon:UserRound,group:"Inteligência"},
 ];
@@ -109,7 +112,7 @@ export default function ControlTower(){
  const [confirmBox,setConfirmBox]=useState<ConfirmBox|null>(null); /* WMS_ESTEIRA_V7_1 */
  const [me,setMe]=useState<{name:string;role:string|null;profile?:Profile|null}>({name:"",role:null});
  useEffect(()=>{fetch("/api/auth",{cache:"no-store"}).then(r=>r.json()).then(setMe).catch(()=>{})},[]);
- const profile=me.profile||null;const seePath=(p:string)=>!profile||canSeePath(profile,p);const mayWrite=(e:string)=>!profile||canWriteEntity(profile,e,"POST");
+ const profile=me.profile||null;const seePath=(p:string)=>(p!=="/erros"||!!(me as {master?:boolean}).master)&&(!profile||canSeePath(profile,p));const mayWrite=(e:string)=>!profile||canWriteEntity(profile,e,"POST");
  useEffect(()=>{if(profile)document.body.dataset.perfil=profile;else delete document.body.dataset.perfil},[profile]);
  const [topMenu,setTopMenu]=useState<"alerts"|"profile"|"quick"|null>(null);
  const route=pathname||"/",parts=route.split("/").filter(Boolean),current=parts[0]||"home";
@@ -316,7 +319,7 @@ export default function ControlTower(){
  const content=()=>{
   if(parts[0]==="clientes"&&parts[1]){const c=data.clients.find(c=>c.id===parts[1]);return c?ClientDetail({client:c}):<Empty title="Cliente não encontrado"/>}
   if(parts[0]==="projetos"&&parts[1]){const p=data.projects.find(p=>p.id===parts[1]);return p?ProjectDetail({project:p}):<Empty title="Projeto não encontrado"/>}
-  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
+  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "erros":return (me as {master?:boolean}).master?<ErrorLog/>:<div className="v7-empty">Somente o administrador master vê os erros do sistema.</div>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
  };
  const formInput=(key:FieldKey,label:string,opts:{type?:string;options?:string[];placeholder?:string;required?:boolean;multiline?:boolean;span?:boolean;custom?:ReactNode}={})=>{
   const value=form[key];const change=(x:unknown)=>setForm(f=>({...f,[key]:x}));
@@ -364,5 +367,5 @@ export default function ControlTower(){
 
   {sidebar&&<button aria-label="Fechar menu" onClick={()=>setSidebar(false)} className="sidebar-overlay"/>}
   {modal&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null)}}><div className={`modal p6-modal p6-modal-${modal.entity}`} role="dialog" aria-modal="true" aria-labelledby="p6-modal-title"><div className="modal-head"><span className="p6-modal-icon" aria-hidden="true">{(()=>{const I=modalIcons[modal.entity];return <I size={24} strokeWidth={1.9}/>})()}</span><div className="p6-modal-heading"><span className="eyebrow">{modal.id?"EDITAR CADASTRO":"NOVO CADASTRO"}</span><h2 id="p6-modal-title">{modal.id?modalEdit[modal.entity]:modalNew[modal.entity]}</h2><p>{modalHints[modal.entity]}</p></div><button className="close-btn" aria-label="Fechar" onClick={()=>setModal(null)}><X size={18}/></button></div><div className="modal-scroll">{formError&&<div className="p6-form-error" role="alert"><AlertTriangle size={17}/><span>{formError}</span></div>}<div className="form-grid">{renderForm()}</div></div><div className="modal-foot">{modal.id&&<button type="button" className="btn ghost p6-modal-delete" disabled={saving} onClick={()=>void removeFromModal()}><Trash2 size={16}/> Excluir</button>}<button className="btn ghost" disabled={saving} onClick={()=>setModal(null)}>Cancelar</button><button className="btn primary" onClick={()=>void persist()} disabled={saving}>{saving?<RefreshCw className="spin" size={17}/>:<Check size={17}/>} {saving?"Salvando...":modal.id?"Salvar alterações":"Cadastrar"}</button></div></div></div>}
-  {toast&&<AppToast message={toast} onClose={()=>setToast("")}/>}<MobileNav onMenu={()=>setSidebar(true)}/></div>
+  {toast&&<AppToast message={toast} onClose={()=>setToast("")}/>}<MobileNav onMenu={()=>setSidebar(true)}/><ErrorReporter/></div>
 }

@@ -191,3 +191,8 @@ export async function sbSnapshotSave(day: string, rows: Row[]) {
 export async function sbSnapshotsLoad(since: string) {
   return rpc<Row[]>("esteira_snapshots_load", { p_key: appKey(), p_since: since });
 }
+
+/* V22 · Erros do sistema */
+export async function sbErrorLog(row: Row) { return rpc<string>("esteira_error_log", { p_key: appKey(), p: row }); }
+export async function sbErrorsLoad(limit = 500) { return rpc<Row[]>("esteira_errors_load", { p_key: appKey(), p_limit: limit }); }
+export async function sbErrorResolve(ids: string[], by: string, note?: string, reopen = false) { return rpc<number>("esteira_error_resolve", { p_key: appKey(), p_ids: ids, p_by: by, p_note: note || null, p_reopen: reopen }); }
