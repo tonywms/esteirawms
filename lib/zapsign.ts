@@ -45,17 +45,20 @@ export const zsDetail = (token: string) => zs<ZsDoc>(`/api/v1/docs/${encodeURICo
 
 /** V21 · Pessoas que já receberam documentos na ZapSign (a API não expõe a agenda de contatos;
  *  lemos os documentos com os signatários). Cache de 10 minutos por servidor.
- *  V21.1 · Se a listagem vier sem os signatários, busca o detalhe de cada documento; devolve um diagnóstico. */
+ *  V21.2 · Segue o link "next" da própria ZapSign, não repete documentos, completa pelo detalhe
+ *  quando a listagem vem sem signatários e devolve um diagnóstico completo. */
 type ZsListSigner = { name?: string; email?: string | null; phone_country?: string | null; phone_number?: string | null; phone?: string | null };
-type ZsListDoc = { token?: string; name?: string; created_at?: string; last_update_at?: string; signers?: ZsListSigner[] };
-export type ZsPeopleInfo = { pages: number; docs: number; withSigners: number; details: number; signers: number; firstKeys: string[]; error?: string };
+type ZsListDoc = { token?: string; open_id?: number | string; name?: string; created_at?: string; last_update_at?: string; signers?: ZsListSigner[] };
+export type ZsPeopleInfo = { pages: number; docs: number; unique: number; withSigners: number; details: number; detailErrors: number; signers: number; firstKeys: string[]; signerKeys: string[]; total?: number; firstError?: string; stoppedBy?: string };
 let peopleCache: { at: number; people: import("./contacts").ZsPerson[]; info: ZsPeopleInfo } | null = null;
 export async function zsPeople(force = false) {
   if (!force && peopleCache && Date.now() - peopleCache.at < 10 * 60 * 1000 && peopleCache.people.length) return { people: peopleCache.people, info: peopleCache.info, cached: true };
+  const t0 = Date.now();
   const map = new Map<string, import("./contacts").ZsPerson>();
-  const info: ZsPeopleInfo = { pages: 0, docs: 0, withSigners: 0, details: 0, signers: 0, firstKeys: [] };
+  const info: ZsPeopleInfo = { pages: 0, docs: 0, unique: 0, withSigners: 0, details: 0, detailErrors: 0, signers: 0, firstKeys: [], signerKeys: [] };
   const add = (d: ZsListDoc, sg: ZsListSigner) => {
-    const name = String(sg.name || "").trim(); if (!name) return;
+    if (!info.signerKeys.length) info.signerKeys = Object.keys(sg || {}).slice(0, 20);
+    const name = String(sg?.name || "").trim(); if (!name) return;
     info.signers++;
     const email = String(sg.email || "").trim().toLowerCase();
     const raw = String(sg.phone_number || sg.phone || "").replace(/\D/g, "");
@@ -66,25 +69,38 @@ export async function zsPeople(force = false) {
     if (cur) { cur.docs++; if (at > cur.lastAt) cur.lastAt = at; if (!cur.phone && phone) cur.phone = phone; if (d.name && cur.docNames.length < 5 && !cur.docNames.includes(d.name)) cur.docNames.push(d.name); }
     else map.set(key, { name, email, phone, docs: 1, lastAt: at, docNames: d.name ? [d.name] : [] });
   };
-  const noSigners: ZsListDoc[] = [];
-  for (let page = 1; page <= 40; page++) {
-    const j = await zs<{ next?: string | null; results?: ZsListDoc[] } | ZsListDoc[]>(`/api/v1/docs/?page=${page}&include_signers=true&sort_order=desc`);
+  const seen = new Set<string>(), noSigners: ZsListDoc[] = [];
+  let path: string | null = `/api/v1/docs/?page=1&include_signers=true&sort_order=desc`;
+  for (let page = 1; path && page <= 30; page++) {
+    const j: { next?: string | null; count?: number; results?: ZsListDoc[] } | ZsListDoc[] = await zs(path);
     const list = Array.isArray(j) ? j : j.results || [];
+    if (!Array.isArray(j) && typeof j.count === "number") info.total = j.count;
     info.pages = page;
-    if (page === 1 && list[0]) info.firstKeys = Object.keys(list[0]).slice(0, 20);
+    if (page === 1 && list[0]) info.firstKeys = Object.keys(list[0]).slice(0, 25);
+    let fresh = 0;
     for (const d of list) {
       info.docs++;
+      const id = String(d.token || d.open_id || `${d.name}|${d.created_at}`);
+      if (seen.has(id)) continue; seen.add(id); fresh++;
       if (Array.isArray(d.signers) && d.signers.length) { info.withSigners++; d.signers.forEach(sg => add(d, sg)); }
       else if (d.token) noSigners.push(d);
     }
-    if (Array.isArray(j) || !j.next || !list.length) break;
+    if (Array.isArray(j) || !list.length) { info.stoppedBy = "fim"; break; }
+    if (!fresh) { info.stoppedBy = "página repetida"; break; }
+    const next: string | null | undefined = j.next;
+    if (!next) { info.stoppedBy = "fim"; break; }
+    // segue o link da própria ZapSign (mantendo o include_signers)
+    try { const u: URL = new URL(String(next), base()); if (!u.searchParams.has("include_signers")) u.searchParams.set("include_signers", "true"); path = u.pathname + u.search; }
+    catch { path = `/api/v1/docs/?page=${page + 1}&include_signers=true&sort_order=desc`; }
+    if (Date.now() - t0 > 20000) { info.stoppedBy = "tempo"; break; }
   }
-  // listagem sem signatários: completa pelo detalhe de cada documento (até 200, 6 por vez)
-  const todo = noSigners.slice(0, 200);
-  for (let k = 0; k < todo.length; k += 6) {
-    await Promise.all(todo.slice(k, k + 6).map(async d => {
+  info.unique = seen.size;
+  // listagem sem signatários: completa pelo detalhe de cada documento (mais recentes primeiro, 4 por vez)
+  const todo = noSigners.slice(0, 150);
+  for (let k = 0; k < todo.length && Date.now() - t0 < 45000; k += 4) {
+    await Promise.all(todo.slice(k, k + 4).map(async d => {
       try { const full = await zsDetail(d.token!); info.details++; (full.signers || []).forEach(sg => add({ ...d, name: full.name || d.name }, sg as ZsListSigner)); }
-      catch { /* documento apagado ou sem acesso: ignora */ }
+      catch (e) { info.detailErrors++; if (!info.firstError) info.firstError = e instanceof Error ? e.message.slice(0, 160) : "erro"; }
     }));
   }
   const people = [...map.values()].sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));

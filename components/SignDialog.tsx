@@ -27,10 +27,10 @@ export default function SignDialog({ target, onClose, onDone }: { target: SignTa
   // V21 · busca de contatos (este cliente, outros clientes e ZapSign), aviso de duplicado e "salvar no cadastro"
   const [clientId, setClientId] = useState(cl?.id || ""), [allClients, setAllClients] = useState<Client[] | null>(null), [zsList, setZsList] = useState<ZsPerson[] | null>(null);
   const [q, setQ] = useState(""), [searchOpen, setSearchOpen] = useState(false);
-  const [zsInfo, setZsInfo] = useState<{ docs: number; people: number; error?: string } | null>(null);
+  const [zsInfo, setZsInfo] = useState<{ docs: number; people: number; detail?: string; error?: string } | null>(null);
   function loadDirectory() {
     if (allClients === null) fetch("/api/records/clients", { cache: "no-store" }).then(r => (r.ok ? r.json() : [])).then(setAllClients).catch(() => setAllClients([]));
-    if (zsList === null) fetch("/api/zapsign/contacts", { cache: "no-store" }).then(async r => { const j = await r.json().catch(() => ({})); setZsList(j.people || []); setZsInfo({ docs: j.info?.docs ?? 0, people: (j.people || []).length, error: !r.ok ? j.error || "Falha ao consultar a ZapSign" : j.configured === false ? "ZapSign não configurada" : undefined }); }).catch(() => { setZsList([]); setZsInfo({ docs: 0, people: 0, error: "Falha ao consultar a ZapSign" }); });
+    if (zsList === null) fetch("/api/zapsign/contacts", { cache: "no-store" }).then(async r => { const j = await r.json().catch(() => ({})); setZsList(j.people || []); setZsInfo({ docs: j.info?.unique ?? j.info?.docs ?? 0, people: (j.people || []).length, detail: j.info ? `${j.info.withSigners} com signatários${j.info.details || j.info.detailErrors ? ` · detalhe ${j.info.details} ok${j.info.detailErrors ? `/${j.info.detailErrors} erro` : ""}` : ""}${j.info.firstError ? ` · ${j.info.firstError}` : ""}` : "", error: !r.ok ? j.error || "Falha ao consultar a ZapSign" : j.configured === false ? "ZapSign não configurada" : undefined }); }).catch(() => { setZsList([]); setZsInfo({ docs: 0, people: 0, error: "Falha ao consultar a ZapSign" }); });
   }
   const [extra, setExtra] = useState<Person[]>([]), [message, setMessage] = useState(""), [whatsapp, setWhatsapp] = useState(false);
   const [file, setFile] = useState<File | null>(null), [busy, setBusy] = useState(false), [pct, setPct] = useState(0), [error, setError] = useState("");
@@ -139,7 +139,7 @@ export default function SignDialog({ target, onClose, onDone }: { target: SignTa
             {searchOpen && q.trim().length >= 2 && <div className="v21-hits">{hits().length ? hits().map(h => <button type="button" key={h.key} onMouseDown={e => e.preventDefault()} onClick={() => pickHit(h)}>
                 {h.src === "zapsign" ? <Cloud size={15} /> : <UserRound size={15} />}<span><b>{h.name}</b><small>{[h.email, fmtPhone(h.phone)].filter(Boolean).join(" · ")}</small></span><em className={`src-${h.src}`}>{h.src === "contato" ? "deste cliente" : h.where}</em></button>)
               : <div className="v21-nohit">{allClients === null || zsList === null ? <><RefreshCw size={13} className="spin" /> Procurando…</> : <>Ninguém encontrado. Use “Incluir outra pessoa” abaixo.</>}</div>}
-              {zsInfo && <div className="v21-zsinfo">{zsInfo.error ? `ZapSign: ${zsInfo.error}` : `ZapSign: ${zsInfo.docs} documento${zsInfo.docs === 1 ? "" : "s"} lidos · ${zsInfo.people} pessoa${zsInfo.people === 1 ? "" : "s"}`}</div>}</div>}
+              {zsInfo && <div className="v21-zsinfo">{zsInfo.error ? `ZapSign: ${zsInfo.error}` : `ZapSign: ${zsInfo.docs} documento${zsInfo.docs === 1 ? "" : "s"} lidos · ${zsInfo.people} pessoa${zsInfo.people === 1 ? "" : "s"}${!zsInfo.people && zsInfo.detail ? ` (${zsInfo.detail})` : ""}`}</div>}</div>}
           </div>
           <div className="v9-field"><span>Quem assina pelo cliente</span>
             <div className="v9-people">{contacts.map(c => { const on = picked.includes(c.id); return <button type="button" key={c.id} className={on ? "on" : ""} disabled={busy} onClick={() => setPicked(v => (on ? v.filter(x => x !== c.id) : [...v, c.id]))}>

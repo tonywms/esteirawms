@@ -13,7 +13,7 @@ const flat = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").t
 
 export default function ZapsignPeople({ clientId, clientName, clients, current, onImport, onClose }: Props) {
   const [people, setPeople] = useState<ZsPerson[] | null>(null), [error, setError] = useState(""), [busy, setBusy] = useState(false);
-  const [info, setInfo] = useState<{ docs: number; withSigners: number; details: number; signers: number } | null>(null);
+  const [info, setInfo] = useState<{ docs: number; unique?: number; withSigners: number; details: number; detailErrors?: number; signers: number; firstError?: string } | null>(null);
   const [q, setQ] = useState(""), [picked, setPicked] = useState<Set<string>>(new Set()), [onlySug, setOnlySug] = useState(true), [mounted, setMounted] = useState(false);
   async function load(force = false) {
     setBusy(true); setError("");
@@ -65,7 +65,7 @@ export default function ZapsignPeople({ clientId, clientName, clients, current, 
                 <i>{p.docs} documento{p.docs > 1 ? "s" : ""}{p.docNames[0] ? ` · ${p.docNames[0]}` : ""}</i></span>
               <span className="tags">{mine && <em className="sug"><Sparkles size={11} /> sugerido</em>}{!mine && sug && <em>{sug.name}?</em>}{dup && <em className={here ? "ok" : "warn"}>{here ? "já está neste cliente" : dupText(dup, clientId)}</em>}</span>
             </button>; }) : <div className="v9-empty"><Info size={15} /> {q ? "Ninguém encontrado com essa busca." : "Nenhuma pessoa encontrada nos documentos da ZapSign."}</div>}</div>}
-        {info && <div className="v21-zsinfo">Li {info.docs} documento{info.docs === 1 ? "" : "s"} da ZapSign{info.details ? ` (${info.details} pelo detalhe)` : ""} · {info.signers} assinatura{info.signers === 1 ? "" : "s"} · {(people || []).length} pessoa{(people || []).length === 1 ? "" : "s"} diferentes</div>}
+        {info && <div className="v21-zsinfo">Li {info.unique ?? info.docs} documento{(info.unique ?? info.docs) === 1 ? "" : "s"} da ZapSign{info.details ? ` (${info.details} pelo detalhe)` : ""}{info.detailErrors ? ` · ${info.detailErrors} com erro${info.firstError ? `: ${info.firstError}` : ""}` : ""} · {info.signers} assinatura{info.signers === 1 ? "" : "s"} · {(people || []).length} pessoa{(people || []).length === 1 ? "" : "s"} diferentes</div>}
         <div className="p6-confirm-note"><Info size={15} /><span>A API da ZapSign não libera a agenda de contatos; aqui aparecem as pessoas dos seus documentos. Contatos que nunca receberam documento você cadastra direto no sistema.</span></div>
       </div>
       <div className="p6-confirm-actions">
