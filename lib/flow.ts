@@ -2,6 +2,7 @@
 // semáforo automático e "com quem está a bola". Tudo calculado, sem preenchimento extra.
 import type { Project, State, PhaseInfo, Task } from "./types";
 import { isBlocked, isDone, todayISO } from "./metrics";
+import { infraSummary, pendText } from "./infra";
 
 // V8 · Ordem oficial: Kickoff/Treinamento > Dev & Integração > Homologação > Implantação (opcional) > Go-live > Encerrado.
 // Cada fase (menos Encerrado) exige o seu PDF assinado para liberar o avanço.
@@ -98,6 +99,9 @@ export function healthOf(p: Project, today = todayISO(), tasks?: Task[]): Health
   if (due && due >= today && (daysBetween(today, due) ?? 99) <= 2) amber.push("Prazo da fase vence em até 2 dias");
   if (ts.noDue.length) amber.push(ts.noDue.length === 1 ? `Atividade sem prazo: “${short(ts.noDue[0].title)}”` : `${ts.noDue.length} atividades sem prazo`);
   if (!(p.nextAction || "").trim()) amber.push("Sem próxima ação definida");
+  // V28: pendências da infraestrutura (coletores, rede, usuário-chave...)
+  const infraPend = infraSummary(p).pending;
+  if (infraPend.length) { const lateI = infraPend.filter(x => x.due && x.due < today); (lateI.length ? red : amber).push(`${lateI.length ? "Pendência de infra vencida" : "Infra pendente"}: ${infraPend.map(pendText).join(", ")}`); }
   const missingDocs = docStates(p).filter(d => d.state === "missing");
   if (missingDocs.length) amber.push(`Documentação pendente: ${missingDocs.map(d => d.doc.replace("Documento de ", "")).join(", ")}`);
   const refused = PHASES.filter(ph => ph.doc && p.phases?.[ph.key]?.sign?.status === "refused" && !p.phases?.[ph.key]?.doc);

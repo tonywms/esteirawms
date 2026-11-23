@@ -9,8 +9,9 @@ import { snapshotRows, type Snap } from "./evolucao";
 import { isDone } from "./metrics";
 import { masterEmails } from "./master";
 import { forecastAll } from "./forecast";
+import { infraSummary, pendText } from "./infra";
 
-export type AlertKind = "task-late" | "task-tomorrow" | "idle" | "phase-due" | "phase-late" | "next-late" | "next-missing";
+export type AlertKind = "task-late" | "task-tomorrow" | "idle" | "phase-due" | "phase-late" | "next-late" | "next-missing" | "infra";
 export type Alert = { kind: AlertKind; project: string; text: string; sev: number };
 export type Mail = { to: string[]; name: string; subject: string; html: string; text: string; count: number };
 
@@ -62,6 +63,11 @@ export function dailyAlerts(s: State, today: string) {
     const due = p.phases?.[k]?.due;
     if (due && due < today) push(owner, { kind: "phase-late", project: c, sev: 3, text: `Prazo da fase ${phaseLabel(k)} venceu em ${br(due)}` });
     else if (due && due <= addDays(today, 2)) push(owner, { kind: "phase-due", project: c, sev: 2, text: `Prazo da fase ${phaseLabel(k)} vence ${due === today ? "hoje" : `em ${br(due)}`}` });
+    for (const it of infraSummary(p).pending) { // V28: pendência de infraestrutura com prazo vencendo/vencido
+      if (!it.due || it.due > tomorrow) continue;
+      const who = it.owner && !/^(cliente|erp)/i.test(it.owner) ? it.owner : owner;
+      push(who, { kind: "infra", project: c, sev: it.due < today ? 3 : 2, text: `Infraestrutura · ${pendText(it)}${it.owner && who !== it.owner ? ` (com ${it.owner})` : ""} — ${it.due < today ? "venceu" : "vence"} em ${br(it.due)}` });
+    }
     if (blank(p.nextAction)) push(owner, { kind: "next-missing", project: c, sev: 1, text: "Sem próxima ação definida — o que precisa acontecer para o projeto andar?" });
     else if (p.nextActionDue && p.nextActionDue < today) push(p.nextActionOwner || owner, { kind: "next-late", project: c, sev: 2, text: `Próxima ação vencida em ${br(p.nextActionDue)}: “${p.nextAction}”` });
   }
@@ -71,9 +77,9 @@ export function dailyAlerts(s: State, today: string) {
 
 const KIND_LABEL: Record<AlertKind, string> = {
   "task-late": "Atividades vencidas", "task-tomorrow": "Vencem hoje ou no próximo dia útil", "phase-late": "Prazo da fase vencido",
-  "phase-due": "Prazo da fase nos próximos 2 dias", idle: "Projetos parados há 7 dias ou mais", "next-late": "Próxima ação vencida", "next-missing": "Projetos sem próxima ação",
+  "phase-due": "Prazo da fase nos próximos 2 dias", infra: "Pendências de infraestrutura", idle: "Projetos parados há 7 dias ou mais", "next-late": "Próxima ação vencida", "next-missing": "Projetos sem próxima ação",
 };
-const ORDER: AlertKind[] = ["task-late", "phase-late", "idle", "next-late", "task-tomorrow", "phase-due", "next-missing"];
+const ORDER: AlertKind[] = ["task-late", "phase-late", "infra", "idle", "next-late", "task-tomorrow", "phase-due", "next-missing"];
 const DOT: Record<number, string> = { 3: "#e5484d", 2: "#f2994a", 1: "#8a97a8" };
 
 function shell(title: string, intro: string, body: string, appUrl: string, cta = "Abrir a esteira") {

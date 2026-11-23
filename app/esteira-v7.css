@@ -1565,3 +1565,63 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v27-proj small { font-size: 11.5px; color: #5b6b80; display: flex; align-items: center; gap: 4px; }
 .v27-proj small.fc.s-risco { color: #b45309; } .v27-proj small.fc.s-atrasado { color: #c22b31; }
 .v27-proj em { font-style: normal; font-size: 11.5px; color: #c22b31; line-height: 1.35; }
+
+/* ===== V28 · Checklist de infraestrutura ===== */
+.v28 { display: grid; gap: 12px; }
+.v28-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.v28-head h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 7px; color: #14213d; }
+.v28-head p { margin: 3px 0 0; font-size: 12px; color: #6b7c90; }
+.v28.compact .v28-head h3 { font-size: 14px; } .v28.compact .v28-head p { display: none; }
+.v28-state { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.v28-state.s-ok { background: #e3f7ea; color: #17733f; } .v28-state.s-pend { background: #fff1e0; color: #b45309; }
+.v28-state.s-none { background: #eef2f6; color: #5b6b80; } .v28-state.s-ready { background: #e6f6fa; color: #0a7f9c; }
+.v28-valid { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; background: linear-gradient(135deg, #e9f8ef, #f3fbf6); border: 1px solid #bfe6cb; color: #17653a; font-size: 12.5px; }
+.v28-valid span { flex: 1; }
+.v28-valid button { border: 1px solid #bfe6cb; background: #fff; color: #17653a; border-radius: 8px; padding: 4px 9px; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.v28-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.v28.compact .v28-grid { gap: 7px; }
+.v28-item { text-align: left; display: flex; gap: 12px; align-items: flex-start; padding: 13px 14px; border-radius: 14px; border: 1px solid #e3ebf1; background: #f8fbfd; font: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; min-width: 0; }
+.v28.compact .v28-item { padding: 9px 10px; gap: 9px; }
+.v28-item:not(:disabled):hover { border-color: #9fd3e2; box-shadow: 0 8px 18px -14px rgba(10, 90, 120, .5); transform: translateY(-1px); }
+.v28-item:disabled { cursor: default; }
+.v28-item .mk { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #eef2f6; color: #8a97a8; }
+.v28-item.t-ok .mk { background: #e3f7ea; color: #1e9a57; } .v28-item.t-pend .mk { background: #fff1e0; color: #d9811a; }
+.v28-item.t-no .mk { background: #fdeaea; color: #c22b31; } .v28-item.t-na .mk { background: #eef2f6; color: #8a97a8; }
+.v28-item.t-pend, .v28-item.t-no { background: #fffaf3; border-color: #f6d9a8; }
+.v28-item.t-no { background: #fff7f7; border-color: #f3c4c6; }
+.v28-item.late { border-color: #e5484d; box-shadow: 0 0 0 1px #e5484d inset; }
+.v28-item .tx { display: grid; gap: 2px; min-width: 0; }
+.v28-item .tx b { font-size: 13px; color: #14213d; }
+.v28-item .tx small { font-size: 11.5px; color: #5b6b80; line-height: 1.35; }
+.v28-item.t-pend .tx small:first-of-type { color: #b45309; font-weight: 600; } .v28-item.t-no .tx small:first-of-type { color: #c22b31; font-weight: 600; }
+.v28-item .tx .who { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; color: #3b5268; }
+.v28-item .tx .who em { font-style: normal; font-weight: 700; } .v28-item .tx .who em.late { color: #c22b31; }
+.v28-item.add { border-style: dashed; background: #fff; }
+.v28-item.add .mk { background: #e6f6fa; color: #0a7f9c; }
+.v28-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+.v28-foot .msg { flex: 1; min-width: 200px; font-size: 12px; color: #5b6b80; display: flex; gap: 6px; align-items: flex-start; }
+.v28-foot .msg.pend { color: #b45309; } .v28-foot .msg.ok { color: #17733f; }
+.v28-foot .btn { height: 36px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.v28-box { padding: 14px !important; }
+@media (max-width: 760px) { .v28-grid { grid-template-columns: 1fr; } }
+.v28-dlg { position: relative; width: min(520px, 100%); background: #fff; border-radius: 22px; padding: 24px 22px 18px; box-shadow: 0 40px 90px -24px rgba(4, 13, 26, .6); display: grid; gap: 12px; color: #14213d; }
+.v28-dlg h2 { margin: 0; font-size: 19px; padding-right: 30px; }
+.v28-dlg .hint { margin: -6px 0 0; font-size: 12.5px; color: #6b7c90; }
+.v28-dlg .fld { display: grid; gap: 4px; }
+.v28-dlg .fld > span, .v28-dlg .lbl { font-size: 12px; font-weight: 700; color: #3b5268; }
+.v28-dlg .fld input { height: 38px; border: 1px solid #d5e0e8; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 13.5px; }
+.v28-dlg .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.v28-dlg .seg button { border: 1.5px solid #dbe5ec; background: #fff; border-radius: 12px; padding: 10px 6px; font: inherit; font-size: 12.5px; font-weight: 700; color: #3b5268; cursor: pointer; display: grid; justify-items: center; gap: 4px; }
+.v28-dlg .seg button.on.t-ok { border-color: #2fbf71; background: #e9f8ef; color: #17733f; }
+.v28-dlg .seg button.on.t-pend { border-color: #f2994a; background: #fff4e6; color: #b45309; }
+.v28-dlg .seg button.on.t-no { border-color: #e5484d; background: #fdeeee; color: #c22b31; }
+.v28-dlg .seg button.on.t-na { border-color: #8a97a8; background: #f1f4f7; color: #3b5268; }
+.v28-dlg .pend { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: #fffaf3; border: 1px solid #f6d9a8; }
+.v28-dlg .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v28-dlg .chips button { border: 1px solid #f0cf98; background: #fff; color: #9a5a0a; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.v28-dlg .chips button.on { background: #f2994a; border-color: #f2994a; color: #fff; }
+.v28-dlg .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.v28-dlg .act { display: flex; gap: 8px; align-items: center; padding-top: 4px; }
+.v28-dlg .act .btn { height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; }
+.v28-dlg .act .danger { color: #c22b31; border-color: #f3c4c6; }
+@media (max-width: 520px) { .v28-dlg .seg { grid-template-columns: 1fr 1fr; } .v28-dlg .grid { grid-template-columns: 1fr; } }

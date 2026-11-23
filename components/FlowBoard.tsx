@@ -12,6 +12,7 @@ import MasterDialog, { type MasterBox } from "./MasterDialog";
 import NextActionDialog, { type NextAction } from "./NextActionDialog";
 import { filesToPdf, uploadProjectPdf } from "@/lib/pdf-compose";
 import { forecastOf, br, brShort } from "@/lib/forecast";
+import InfraChecklist from "./InfraChecklist";
 import { Rocket as RocketV27 } from "lucide-react";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
@@ -265,6 +266,8 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           </div>
           {nextOptions.length > 0 && !canMove(p, nextOptions[0]).ok && <div className={`v7-gate ${p.phases?.[k]?.sign?.status === "pending" ? "zs" : ""}`}>{p.phases?.[k]?.sign?.status === "pending" ? <PenLine size={18} /> : <FileX2 size={18} />}<span>{p.phases?.[k]?.sign?.status === "pending" ? `Aguardando o cliente assinar na ZapSign (${p.phases[k]!.sign!.signers.filter(x => x.status === "signed").length}/${p.phases[k]!.sign!.signers.length}). O avanço é liberado quando o PDF assinado chegar.` : canMove(p, nextOptions[0]).reason}</span>{PHASES[idx].doc && !p.phases?.[k]?.sign?.status?.startsWith("pend") && <button type="button" onClick={() => pickFile(k)} disabled={!!busy}><Upload size={14} /> Anexar agora</button>}{PHASES[idx].doc && !p.phases?.[k]?.sign && <button type="button" className="v13-gate-zs" onClick={() => setSignTarget({ kind: "phase", projectId: p.id, phase: k, docLabel: PHASES[idx].doc, client: data.clients.find(c => c.id === p.clientId) })} disabled={!!busy}><PenLine size={14} /> Enviar p/ assinatura</button>}<button type="button" className="v9-master-btn" onClick={() => openMaster("advance")} disabled={!!busy} title="Usuário master libera o avanço sem o PDF"><ShieldCheck size={14} /> {me?.releaser ? "Liberar sem PDF" : "Liberar (master)"}</button></div>}
         </section>
+
+        <section className="v7-box v28-box"><InfraChecklist project={p} data={data} onRefresh={onRefresh} notify={m => flash(m.replace(/^Falha: /, ""), m.startsWith("Falha"))} compact /></section>
 
         <section className="v7-box">
           <h3><Target size={15} /> Próxima ação</h3>
