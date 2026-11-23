@@ -6,7 +6,7 @@ import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, File
 import type { State } from "@/lib/types";
 import { PHASES, ballOf, docStates, flowSummary, phaseIndex, phaseOwner, unlockSummary, type Health } from "@/lib/flow";
 import { fmtDate, todayISO } from "@/lib/metrics";
-import { avatarUrl } from "@/lib/avatars";
+import { avatarUrl, registerAvatars } from "@/lib/avatars";
 import { PersonPhoto } from "./PersonPhoto";
 import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
 
@@ -20,7 +20,7 @@ export default function TvPanel() {
   const [data, setData] = useState<State>(empty), [updated, setUpdated] = useState<Date | null>(null), [err, setErr] = useState("");
   const [view, setView] = useState(0), [now, setNow] = useState(() => new Date());
   const load = useCallback(async () => {
-    try { const r = await fetch("/api/state", { cache: "no-store" }); if (!r.ok) throw new Error(r.status === 401 ? "Link da TV expirado: abra novamente o link com a chave." : "Falha ao carregar"); setData(await r.json()); setUpdated(new Date()); setErr(""); }
+    try { const r = await fetch("/api/state", { cache: "no-store" }); if (!r.ok) throw new Error(r.status === 401 ? "Link da TV expirado: abra novamente o link com a chave." : "Falha ao carregar"); const j = await r.json(); registerAvatars(j.avatars); setData(j); setUpdated(new Date()); setErr(""); }
     catch (e) { setErr(e instanceof Error ? e.message : "Sem conexão"); }
   }, []);
   useEffect(() => { void load(); const a = setInterval(() => void load(), REFRESH_MS), b = setInterval(() => setView(v => (v + 1) % N), ROTATE_MS), c = setInterval(() => setNow(new Date()), 1000); return () => { clearInterval(a); clearInterval(b); clearInterval(c); }; }, [load]);

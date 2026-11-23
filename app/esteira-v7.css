@@ -1429,3 +1429,28 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v25-up > footer .btn { height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; }
 .v20-extra h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .v20-extra h3 em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: var(--p6-info-bg); color: var(--p6-teal-600); }
+
+/* ===== V26 · Foto de perfil enviada pelo app ===== */
+.v26-photo-btn { position: relative; display: inline-flex; padding: 0; border: 0; background: none; border-radius: 999px; cursor: pointer; flex: none; }
+.v26-photo-btn .cam { position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #0a7f9c; color: #fff; border: 2px solid #fff; opacity: 0; transform: scale(.7); transition: opacity .15s, transform .15s; box-shadow: 0 4px 10px -4px rgba(10, 60, 90, .6); }
+.v26-photo-btn:hover .cam, .v26-photo-btn:focus-visible .cam { opacity: 1; transform: none; }
+.v26-photo-btn:focus-visible { outline: 2px solid #16b8d4; outline-offset: 2px; }
+@media (hover: none) { .v26-photo-btn .cam { opacity: 1; transform: none; } }
+.profile-avatar.v26-pa { position: relative; overflow: hidden; color: transparent; }
+.profile-avatar.v26-pa img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+.v26-photo { position: relative; width: min(420px, 100%); background: #fff; border-radius: 22px; padding: 24px 24px 20px; box-shadow: 0 40px 90px -24px rgba(4, 13, 26, .6); display: grid; justify-items: center; gap: 12px; color: #14213d; text-align: center; }
+.v26-photo h2 { margin: 0; font-size: 19px; }
+.v26-photo > p { margin: -4px 0 0; font-size: 12.5px; color: #5b6b80; line-height: 1.45; }
+.v26-photo .stage { position: relative; border-radius: 50%; overflow: hidden; background: #eef4f8; box-shadow: 0 0 0 4px #fff, 0 0 0 6px #cfe3ea, 0 18px 40px -20px rgba(10, 60, 90, .5); touch-action: none; cursor: grab; user-select: none; }
+.v26-photo .stage:active { cursor: grabbing; }
+.v26-photo .stage > img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; }
+.v26-photo .stage > img.cur { width: 100%; height: 100%; object-fit: cover; position: static; }
+.v26-photo .stage .ini { display: grid; place-items: center; width: 100%; height: 100%; font-size: 64px; font-weight: 800; color: #0a7f9c; }
+.v26-photo .stage .hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font-style: normal; font-size: 11px; font-weight: 700; color: #fff; background: rgba(8, 30, 48, .55); padding: 3px 9px; border-radius: 999px; pointer-events: none; white-space: nowrap; }
+.v26-photo .zoom { display: flex; align-items: center; gap: 8px; width: 240px; color: #3b5268; }
+.v26-photo .zoom input { flex: 1; accent-color: #0a98b5; }
+.v26-photo .pick { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.v26-photo .pick .btn, .v26-photo .act .btn { height: 36px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 0 14px; }
+.v26-photo .pick .danger { color: #c22b31; border-color: #f3c4c6; }
+.v26-photo .act { display: flex; gap: 8px; justify-content: flex-end; width: 100%; border-top: 1px solid #e6edf3; padding-top: 14px; margin-top: 4px; }

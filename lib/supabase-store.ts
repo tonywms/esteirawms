@@ -196,3 +196,9 @@ export async function sbSnapshotsLoad(since: string) {
 export async function sbErrorLog(row: Row) { return rpc<string>("esteira_error_log", { p_key: appKey(), p: row }); }
 export async function sbErrorsLoad(limit = 500) { return rpc<Row[]>("esteira_errors_load", { p_key: appKey(), p_limit: limit }); }
 export async function sbErrorResolve(ids: string[], by: string, note?: string, reopen = false) { return rpc<number>("esteira_error_resolve", { p_key: appKey(), p_ids: ids, p_by: by, p_note: note || null, p_reopen: reopen }); }
+
+/* V26 · Fotos de perfil enviadas pelo app */
+export async function sbAvatarSet(akey: string, name: string, data: string, by?: string) { return rpc<string>("esteira_avatar_set", { p_key: appKey(), p_akey: akey, p_name: name, p_data: data, p_by: by || null }); }
+export async function sbAvatarGet(akey: string) { return rpc<string | null>("esteira_avatar_get", { p_key: appKey(), p_akey: akey }); }
+export async function sbAvatarsList() { return rpc<{ key: string; name: string; updated_at: string }[]>("esteira_avatars_list", { p_key: appKey() }); }
+export async function sbAvatarDelete(akey: string) { return rpc<boolean>("esteira_avatar_delete", { p_key: appKey(), p_akey: akey }); }
