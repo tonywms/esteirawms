@@ -1767,3 +1767,8 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v29-table .w-ativ { min-width: 320px; } .v29-table .w-fase { min-width: 150px; }
 .v29-table .chips { align-items: center; }
 .v29-table .chips .add-p { width: auto; height: 22px; font-size: 11px; color: #0a7f9c; font-weight: 700; padding: 0 4px; border: 1px dashed #b9d7e2; border-radius: 999px; background: #fff; }
+/* V30 · equipe WMS no cronograma e escopo Word */
+.v29-meta { row-gap: 10px; }
+.v29-meta .v30-unit { height: 34px; border: 1px solid #d5e0e8; border-radius: 9px; padding: 0 10px; font: inherit; font-size: 13px; width: 190px; }
+.v29-table .chips .auto { font-size: 11px; color: #0a7f9c; font-weight: 600; }
+.v30-word { border-color: #2b579a !important; color: #2b579a !important; }

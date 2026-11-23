@@ -1,12 +1,12 @@
 // V29 · Excel do cronograma (mesmas cores e blocos do PDF) para enviar ao cliente.
 import type { Client, Project } from "./types";
 import { buildXlsx, colName, excelDate, type Cell, type Style } from "./xlsx";
-import { GROUPS, clientDisplayName, clientPeople, fmtCnpj, fmtPhone, scheduleOf } from "./schedule";
+import { GROUPS, clientDisplayName, clientNames, expertNames, fmtCnpj, fmtPhone, scheduleOf } from "./schedule";
 
 const NAVY = "#0B1A2C", ALT = "#F4F7FA", PINK = "#FDECEC", RED = "#C0392B", TEXT = "#3D4A59", DARK = "#14213D", SUB = "#6B7C90";
 
 export function buildScheduleXlsx(project: Project, client: Client | undefined, opts: { consultant?: string } = {}) {
-  const name = clientDisplayName(client), info = client?.info || {}, ppl = clientPeople(info);
+  const name = clientDisplayName(client), info = client?.info || {};
   const sched = scheduleOf(project.schedule);
   const rows: (Cell | null)[][] = [], merges: string[] = [], heights: Record<number, number> = {};
   const N = 12; // A..L
@@ -34,9 +34,9 @@ export function buildScheduleXlsx(project: Project, client: Client | undefined, 
     if (x.group !== gKey) { closeBand(rows.length); gKey = x.group; gStart = rows.length + 1; }
     const pink = !!x.highlight, fill = pink ? PINK : i % 2 === 0 ? ALT : undefined, color = pink ? RED : TEXT;
     const base: Style = { size: 10, color, fill, border: true, valign: "center" }, cen: Style = { ...base, align: "center" };
-    const names = (x.clientPeople || []).map(k => ppl.find(p => p.key === k)?.person.name || k).filter(Boolean).join(", ");
+    const names = clientNames(x, info).join(", ");
     const rr = put([
-      null, t(x.phase, base), t(x.activity, { ...base, bold: !pink, color: pink ? RED : DARK }), t(x.expert, cen), t(x.expertPerson || "", { ...base, color: pink ? RED : SUB }),
+      null, t(x.phase, base), t(x.activity, { ...base, bold: !pink, color: pink ? RED : DARK }), t(x.expert, cen), t(expertNames(x, sched.team, opts.consultant).join(", "), { ...base, color: pink ? RED : SUB }),
       t(x.expertHrs ? Number(x.expertHrs) || x.expertHrs : "", cen), t(x.client, base), t(names, { ...base, color: pink ? RED : SUB }), t(x.clientHrs ? Number(x.clientHrs) || x.clientHrs : "", cen),
       x.start ? { v: excelDate(x.start), s: cen, date: true } : t(x.continuous ? "-" : "", cen), x.end ? { v: excelDate(x.end), s: cen, date: true } : t(x.continuous ? "-" : "", cen),
       t(x.done ? "Concluída" : "", { ...cen, color: "#1E7A45", bold: true }),

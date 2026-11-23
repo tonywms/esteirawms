@@ -4,7 +4,7 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
 import type { Client, Project, ScheduleRow } from "./types";
 import { LOGO_BLUE_PNG, LOGO_BLUE_RATIO } from "./brand-logo";
-import { GROUPS, brDate, clientDisplayName, clientPeople, fmtCnpj, fmtPhone, scheduleOf } from "./schedule";
+import { GROUPS, TEAM_ROLES, brDate, clientDisplayName, clientNames, clientPeople, expertNames, fmtCnpj, fmtPhone, scheduleOf } from "./schedule";
 
 const W = 841.92, H = 595.32, L = 50, R = 792;
 const hex = (h: string): RGB => { const n = parseInt(h.replace("#", ""), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); };
@@ -53,7 +53,8 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
       ["Patrocinador", line(info.sponsor)],
       ...[0, 1, 2].filter(i => i === 0 || info.keyUsers?.[i]?.name).map(i => [`Key user ${i + 1}`, line(info.keyUsers?.[i])] as [string, string]),
       ...(info.itSupport?.name ? [["Suporte TI", line(info.itSupport)] as [string, string]] : []),
-      ["Projeto", project.name], ["Consultor WMS Expert", opts.consultant || "—"], ["Data de emissão", new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })],
+      ["Projeto", project.name], ["Consultor WMS Expert", opts.consultant || "—"],
+      ...TEAM_ROLES.filter(r => project.schedule?.team?.[r.key]).map(r => [`${r.label} (WMS Expert)`, String(project.schedule!.team![r.key])] as [string, string]), ["Data de emissão", new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })],
     ];
     let y = H - 150;
     p.drawRectangle({ x: L, y: y - 21.6, width: R - L, height: 21.6, color: C.navy });
@@ -72,9 +73,9 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
 
   /* ---------- Cronograma ---------- */
   const sched = scheduleOf(project.schedule);
-  const ppl = clientPeople(client?.info);
-  const namesOf = (r: ScheduleRow) => (r.clientPeople || []).map(k => ppl.find(x => x.key === k)?.person.name || k).filter(Boolean);
-  const heightOf = (r: ScheduleRow) => (namesOf(r).length || r.expertPerson ? 21 : 15.6);
+  const namesOf = (r: ScheduleRow) => clientNames(r, client?.info);
+  const expOf = (r: ScheduleRow) => expertNames(r, sched.team, opts.consultant).join(", ");
+  const heightOf = (r: ScheduleRow) => (namesOf(r).length || expOf(r) ? 21 : 15.6);
   let page = newPage(); sectionHead(page, "06  ·  PLANEJAMENTO", "Cronograma");
   let y = H - 146;
   const header = () => {
@@ -119,7 +120,7 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
     center(page, fonts.r, r.start ? brDate(r.start) : r.continuous ? "-" : "", COL.ini, ty, s, tc, 50);
     center(page, fonts.r, r.end ? brDate(r.end) : r.continuous ? "-" : "", COL.fim, ty, s, tc, 50);
     const names = namesOf(r);
-    if (r.expertPerson) center(page, fonts.r, r.expertPerson, COL.expC, ty - 8, 6, pink ? C.red : C.sub, COL.expW + 10);
+    if (expOf(r)) center(page, fonts.r, expOf(r), COL.expC, ty - 8, 6, pink ? C.red : C.sub, COL.expW + 10);
     if (names.length) page.drawText(fit(fonts.r, names.join(", "), 6, COL.hrsC - COL.cli - 14), { x: COL.cli, y: ty - 8, size: 6, font: fonts.r, color: pink ? C.red : C.sub });
     y -= h; idx++;
   }

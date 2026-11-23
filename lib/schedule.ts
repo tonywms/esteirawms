@@ -79,3 +79,35 @@ export function scheduleStats(s: ProjectSchedule, today: string) {
   const next = rows.filter(r => !r.done && (r.start || r.end) && (r.end || r.start)! >= today).sort((a, b) => String(a.start || a.end).localeCompare(String(b.start || b.end)))[0] || null;
   return { total: rows.length, dated: dated.length, done: rows.filter(r => r.done).length, late, next };
 }
+
+/* ---------- V30 · Responsáveis automáticos pela função (time Expert e time cliente) ---------- */
+import type { ScheduleTeam } from "./types";
+const nrm = (s?: string | null) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+export const TEAM_ROLES: { key: keyof ScheduleTeam; label: string; hint: string }[] = [
+  { key: "gestor", label: "Gestor de implantação", hint: "Consultor / Consultor Sênior Expert" },
+  { key: "instrutor", label: "Instrutor / Treinador", hint: "Treinador Expert, Instrutor Expert" },
+  { key: "instrutorTI", label: "Instrutor de TI", hint: "Integração (views, API, BOT INTEGRA)" },
+  { key: "qualidade", label: "Qualidade", hint: "Qualidade Expert" },
+  { key: "comercial", label: "Analista comercial", hint: "Kickoff e ativação" },
+];
+/** Quem da WMS Expert faz a linha: o escolhido na linha, senão a pessoa da equipe pela função. */
+export function expertNames(r: ScheduleRow, team?: ScheduleTeam, consultant?: string): string[] {
+  if (r.expertPerson) return [r.expertPerson];
+  const t = nrm(r.expert), out: string[] = [];
+  if (t.includes("instrutor de ti") && team?.instrutorTI) out.push(team.instrutorTI);
+  if ((t.includes("treinador") || t.includes("instrutor expert")) && team?.instrutor) out.push(team.instrutor);
+  if (t.includes("qualidade") && team?.qualidade) out.push(team.qualidade);
+  if (t.includes("comercial") && team?.comercial) out.push(team.comercial);
+  if (t.includes("consultor") && (team?.gestor || consultant)) out.push((team?.gestor || consultant)!);
+  return [...new Set(out)];
+}
+/** Quem do cliente: os escolhidos na linha, senão pela função (key users, patrocinador, TI). */
+export function clientNames(r: ScheduleRow, info?: ClientInfo | null): string[] {
+  const ppl = clientPeople(info);
+  if (r.clientPeople?.length) return r.clientPeople.map(k => ppl.find(x => x.key === k)?.person.name || "").filter(Boolean);
+  const t = nrm(r.client);
+  if (t.includes("key user")) return (info?.keyUsers || []).map(k => k.name).filter(Boolean);
+  if (t.includes("patrocinador") || t.includes("gestor cliente")) return info?.sponsor?.name ? [info.sponsor.name] : [];
+  if (t.includes("ti cliente")) return info?.itSupport?.name ? [info.itSupport.name] : [];
+  return [];
+}
