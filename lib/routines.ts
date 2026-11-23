@@ -8,6 +8,7 @@ import { attackFirst, gargalosSummary, heatmap, businessDays } from "./gargalos"
 import { snapshotRows, type Snap } from "./evolucao";
 import { isDone } from "./metrics";
 import { masterEmails } from "./master";
+import { forecastAll } from "./forecast";
 
 export type AlertKind = "task-late" | "task-tomorrow" | "idle" | "phase-due" | "phase-late" | "next-late" | "next-missing";
 export type Alert = { kind: AlertKind; project: string; text: string; sev: number };
@@ -75,13 +76,13 @@ const KIND_LABEL: Record<AlertKind, string> = {
 const ORDER: AlertKind[] = ["task-late", "phase-late", "idle", "next-late", "task-tomorrow", "phase-due", "next-missing"];
 const DOT: Record<number, string> = { 3: "#e5484d", 2: "#f2994a", 1: "#8a97a8" };
 
-function shell(title: string, intro: string, body: string, appUrl: string) {
+function shell(title: string, intro: string, body: string, appUrl: string, cta = "Abrir a esteira") {
   return `<!doctype html><html><body style="margin:0;background:#f3f6fa;font-family:Segoe UI,Arial,sans-serif;color:#14213d">
 <div style="max-width:640px;margin:0 auto;padding:24px 16px">
 <div style="background:#0b2a4a;color:#fff;border-radius:14px 14px 0 0;padding:18px 22px"><div style="font-size:11px;letter-spacing:.12em;opacity:.75">WMS EXPERT · ESTEIRA</div><div style="font-size:20px;font-weight:700;margin-top:4px">${esc(title)}</div></div>
 <div style="background:#fff;border-radius:0 0 14px 14px;padding:20px 22px;border:1px solid #e3e9f1;border-top:0">
 <p style="margin:0 0 16px;font-size:14px;line-height:1.5">${intro}</p>${body}
-<p style="margin:22px 0 0"><a href="${esc(appUrl)}" style="background:#16b8d4;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;font-size:14px">Abrir a esteira</a></p>
+<p style="margin:22px 0 0"><a href="${esc(appUrl)}" style="background:#16b8d4;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;font-size:14px">${esc(cta)}</a></p>
 </div><p style="font-size:11px;color:#7a8799;text-align:center;margin-top:14px">E-mail automático da rotina das 7h. Para parar de receber, atualize a esteira — os alertas somem quando o item é resolvido.</p></div></body></html>`;
 }
 
@@ -93,7 +94,7 @@ export function dailyMail(name: string, alerts: Alert[], today: string, appUrl: 
   const late = alerts.filter(a => a.sev === 3).length;
   const subject = `Esteira · ${br(today)} · ${alerts.length} ponto(s) para você${late ? ` (${late} vencido/parado)` : ""}`;
   const text = `Bom dia, ${first}. Pontos da esteira para hoje (${br(today)}):\n\n` + groups.map(g => `${KIND_LABEL[g.k]}:\n` + g.items.map(a => ` - ${a.project}: ${a.text}`).join("\n")).join("\n\n") + `\n\n${appUrl}`;
-  return { name, subject, count: alerts.length, text, html: shell(`Seu dia na esteira · ${br(today)}`, `Bom dia, <b>${esc(first)}</b>. Estes são os pontos que dependem de você hoje.`, body, appUrl) };
+  return { name, subject, count: alerts.length, text, html: shell(`Seu dia na esteira · ${br(today)}`, `Bom dia, <b>${esc(first)}</b>. Estes são os pontos que dependem de você hoje.`, body, `${appUrl}/minha-semana`, "Abrir minha semana") };
 }
 
 /** Monta todos os e-mails da rotina diária. Quem não tem e-mail cadastrado vai para os masters. */
@@ -133,6 +134,10 @@ export function buildWeekly(s: State, today: string, appUrl: string, weekAgo: Sn
   const late = s.tasks.filter(t => ids.has(t.projectId) && openTask(t) && t.dueDate && t.dueDate < today);
   const byOwner = [...late.reduce((m, t) => m.set(t.owner || "Sem responsável", (m.get(t.owner || "Sem responsável") || 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1]);
   const noNext = map.heats.filter(h => !h.nextAction);
+  const fc = [...forecastAll(s, today).values()].filter(f => f.status !== "virou");
+  const in30 = addDays(today, 30);
+  const soon = fc.filter(f => f.forecast <= in30).sort((a, b) => a.forecast.localeCompare(b.forecast));
+  const risk = fc.filter(f => f.status === "risco" || f.status === "atrasado").sort((a, b) => (b.diff || 0) - (a.diff || 0));
   const kpi = (v: string, l: string, c = "#0b2a4a") => `<td style="padding:10px;background:#f7f9fc;border-radius:10px;text-align:center;width:25%"><div style="font-size:22px;font-weight:700;color:${c}">${esc(v)}</div><div style="font-size:11px;color:#5b6b80">${esc(l)}</div></td>`;
   const sec = (t: string, inner: string) => `<h3 style="font-size:14px;margin:22px 0 8px;color:#0b2a4a">${t}</h3>${inner}`;
   const row = (a: string, b: string, color = "#16b8d4") => `<div style="padding:7px 10px;border-left:3px solid ${color};background:#f7f9fc;margin:0 0 5px;font-size:13px">${a}${b ? `<br><span style="color:#5b6b80">${b}</span>` : ""}</div>`;
@@ -142,11 +147,13 @@ export function buildWeekly(s: State, today: string, appUrl: string, weekAgo: Sn
     sec("Atacar primeiro", attack.length ? attack.map((a, i) => row(`<b>${i + 1}. ${esc(a.h.client)}</b> · ${esc(ph(a.h.phase))} · ${esc(a.h.owner)}`, `${esc(a.problem)} → ${esc(a.next)}`, i < 2 ? "#e5484d" : "#f2994a")).join("") : row("Nenhum projeto com problema relevante.", "", "#2fbf71")) +
     sec("Quem andou na semana", weekAgo.length ? (up.length ? up.map(x => row(`<b>${esc(name(x.r))}</b> · ${x.phaseChanged ? `${esc(ph(x.b!.phase))} → ${esc(ph(x.r.phase))}` : esc(ph(x.r.phase))}`, `${(x.d as number) >= 0 ? "+" : ""}${x.d} p.p. de avanço`, "#2fbf71")).join("") : row("Nenhum projeto avançou nos últimos 7 dias.", "", "#e5484d")) +
       (still.length ? `<p style="font-size:12px;color:#5b6b80;margin:6px 0 0">Sem avanço na semana (${still.length}): ${still.slice(0, 12).map(x => esc(name(x.r))).join(", ")}${still.length > 12 ? "…" : ""}</p>` : "") : `<p style="font-size:13px;color:#5b6b80">Ainda não há fotos de 7 dias atrás para comparar; a partir da próxima semana este bloco mostra quem andou.</p>`) +
+    sec(`Go-lives previstos nos próximos 30 dias (${soon.length})`, soon.length ? soon.slice(0, 10).map(f => row(`<b>${esc(f.client)}</b> · previsto ${br(f.forecast)}${f.promised ? ` · prometido ${br(f.promised)}` : " · <i>sem data prometida</i>"}`, `${esc(ph(f.phase))} · ${esc(f.owner)} · confiança ${f.confidence}`, f.status === "atrasado" ? "#e5484d" : f.status === "risco" ? "#f2994a" : "#16b8d4")).join("") : row("Nenhuma virada prevista nos próximos 30 dias.", "", "#8a97a8")) +
+    (risk.length ? sec(`Em risco vs data prometida (${risk.length})`, risk.slice(0, 8).map(f => row(`<b>${esc(f.client)}</b>: ${f.diff} dia(s) útil(eis) depois do prometido`, `prometido ${br(f.promised)} · previsto ${br(f.forecast)} · ${esc(f.reason)}`, "#e5484d")).join("")) : "") +
     sec(`Atividades vencidas (${late.length})`, late.length ? byOwner.map(([o, n]) => row(`<b>${esc(o)}</b>: ${n} vencida(s)`, "", "#e5484d")).join("") : row("Nenhuma atividade vencida.", "", "#2fbf71")) +
     sec(`Projetos sem próxima ação (${noNext.length} de ${map.heats.length})`, noNext.length ? `<p style="font-size:13px;margin:0">${noNext.slice(0, 20).map(h => `${esc(h.client)} <span style="color:#7a8799">(${esc(h.owner)})</span>`).join(" · ")}${noNext.length > 20 ? " …" : ""}</p>` : row("Todos os projetos têm próxima ação.", "", "#2fbf71"));
   const to = [...new Set([...masterEmails(), ...s.staff.filter(x => x.active !== false && x.escalation && x.email).map(x => String(x.email).trim().toLowerCase())])];
   const text = `Resumo semanal da esteira (${br(today)})\nAtivos: ${sum.active} · Críticos: ${sum.red} · Dentro da meta: ${sum.pctInGoal ?? "—"}%\n\nAtacar primeiro:\n` + attack.map((a, i) => `${i + 1}. ${a.h.client} (${ph(a.h.phase)}): ${a.problem} → ${a.next}`).join("\n") + `\n\nAtividades vencidas: ${late.length}\nSem próxima ação: ${noNext.length}\n\n${appUrl}`;
   const mail: Mail = { to, name: "Resumo semanal", count: attack.length, subject: `Esteira · resumo da semana · ${br(today)} · ${sum.red} crítico(s)`, text,
     html: shell(`Resumo da semana · ${br(today)}`, "Como a esteira está, onde trava e o que atacar primeiro nesta semana.", body, appUrl) };
-  return { mail, stats: { active: sum.active, red: sum.red, attack: attack.length, late: late.length, noNext: noNext.length, moved: up.length } };
+  return { mail, stats: { active: sum.active, red: sum.red, attack: attack.length, late: late.length, noNext: noNext.length, moved: up.length, golive30: soon.length, risco: risk.length } };
 }

@@ -14,6 +14,9 @@ import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOw
 import TaskAttachments from "./TaskAttachments";
 import MobileNav from "./MobileNav";
 import ErrorReporter from "./ErrorReporter";
+import Previsao from "./Previsao";
+import MinhaSemana from "./MinhaSemana";
+import { CalendarCheck as CalendarCheckV27, Rocket as RocketV27 } from "lucide-react"; /* WMS_ESTEIRA_V27 */
 import { PhotoButton, PhotoHost, MyPhotoItem } from "./PhotoDialog";
 import { registerAvatars as registerAvatarsV26 } from "@/lib/avatars"; /* WMS_ESTEIRA_V26 */
 import ProjectDocs from "./ProjectDocs"; /* WMS_ESTEIRA_V25 */
@@ -44,9 +47,11 @@ const FieldIcon=({k,type,entity}:{k:string;type?:string;entity?:EntityName})=>{c
 type FieldKey=string;
 const paths=[
  {path:"/",label:"Painel executivo",icon:LayoutDashboard,group:"Gestão estratégica"},
+ {path:"/minha-semana",label:"Minha semana",icon:CalendarCheckV27,group:"Gestão estratégica"},
  {path:"/esteira",label:"Esteira por ondas",icon:Waves,group:"Gestão estratégica"},
  {path:"/gargalos",label:"Mapa de gargalos",icon:Flame,group:"Gestão estratégica"},
  {path:"/evolucao",label:"Evolução da esteira",icon:TrendingUpV18,group:"Gestão estratégica"},
+ {path:"/previsao",label:"Previsão de go-live",icon:RocketV27,group:"Gestão estratégica"},
  {path:"/clientes",label:"Clientes",icon:Users,group:"Operação"},
  {path:"/projetos",label:"Projetos",icon:Layers3,group:"Operação"},
  {path:"/atividades",label:"Atividades & SLA",icon:ListTodo,group:"Operação"},
@@ -323,7 +328,7 @@ export default function ControlTower(){
  const content=()=>{
   if(parts[0]==="clientes"&&parts[1]){const c=data.clients.find(c=>c.id===parts[1]);return c?ClientDetail({client:c}):<Empty title="Cliente não encontrado"/>}
   if(parts[0]==="projetos"&&parts[1]){const p=data.projects.find(p=>p.id===parts[1]);return p?ProjectDetail({project:p}):<Empty title="Projeto não encontrado"/>}
-  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "erros":return (me as {master?:boolean}).master?<ErrorLog/>:<div className="v7-empty">Somente o administrador master vê os erros do sistema.</div>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
+  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "erros":return (me as {master?:boolean}).master?<ErrorLog/>:<div className="v7-empty">Somente o administrador master vê os erros do sistema.</div>;case "previsao":return <Previsao data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "minha-semana":return <MinhaSemana data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
  };
  const formInput=(key:FieldKey,label:string,opts:{type?:string;options?:string[];placeholder?:string;required?:boolean;multiline?:boolean;span?:boolean;custom?:ReactNode}={})=>{
   const value=form[key];const change=(x:unknown)=>setForm(f=>({...f,[key]:x}));

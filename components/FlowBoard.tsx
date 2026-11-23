@@ -11,6 +11,8 @@ import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import MasterDialog, { type MasterBox } from "./MasterDialog";
 import NextActionDialog, { type NextAction } from "./NextActionDialog";
 import { filesToPdf, uploadProjectPdf } from "@/lib/pdf-compose";
+import { forecastOf, br, brShort } from "@/lib/forecast";
+import { Rocket as RocketV27 } from "lucide-react";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
 import SignDialog, { type SignTarget } from "./SignDialog";
@@ -116,6 +118,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
           <div className="v7-card-meta">
             <span title="Dias na fase"><Timer size={12} />{h.inPhase ?? "–"}d</span>
             <span className={`v7-ball-chip b-${ballOf(p).split(" ")[0].toLowerCase()}`} title="Com quem está a bola"><Hand size={11} />{ballOf(p)}</span>
+            {(() => { const f = forecastOf(data, p); return f && f.status !== "virou" ? <span className={`v27-chip s-${f.status}`} title={`Go-live previsto ${br(f.forecast)}${f.promised ? ` · prometido ${br(f.promised)}` : ""} · ${f.reason}`}><RocketV27 size={11} />{brShort(f.forecast)}</span> : null; })()}
           </div>
           <div className="v7-docs" aria-label="Documentos da esteira">{docStates(p).map(d => <span key={d.key} className={`v7-doc s-${d.state}`} title={`${d.label} · ${d.doc}: ${DOC_STATE_LABEL[d.state]}`}><DocIcon s={d.state} /><b>{d.letter}</b></span>)}</div>
           {h.health === "red" || h.health === "amber" ? <div className={h.health === "red" ? "v7-card-block" : "v7-card-warn"}><AlertTriangle size={12} />{h.reasons[0]}{h.reasons.length > 1 && <i className="v15-more">+{h.reasons.length - 1}</i>}</div>
@@ -229,7 +232,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
     <aside className="v7-drawer" role="dialog" aria-modal="true" aria-label={`Projeto ${clientName(data, p.clientId)}`}>
       <header className={`v7-drawer-head v7-${h.health}`}>
         <div><span className="v7-drawer-eyebrow">{p.wave || "Sem onda"} · {p.system}</span><h2>{clientName(data, p.clientId)}</h2>
-          <div className="v7-drawer-tags"><span className={`v7-health-pill v7-${h.health}`}><Dot h={h.health} />{healthLabel[h.health]}</span><span className="v7-ghost-pill"><Timer size={13} />{h.inPhase ?? "–"} dias na fase</span><span className="v7-ghost-pill"><Clock3 size={13} />{h.idle ?? "–"} dias sem movimento</span></div></div>
+          <div className="v7-drawer-tags"><span className={`v7-health-pill v7-${h.health}`}><Dot h={h.health} />{healthLabel[h.health]}</span><span className="v7-ghost-pill"><Timer size={13} />{h.inPhase ?? "–"} dias na fase</span><span className="v7-ghost-pill"><Clock3 size={13} />{h.idle ?? "–"} dias sem movimento</span>{(() => { const f = forecastOf(data, p); return f ? <span className={`v7-ghost-pill v27-pill s-${f.status}`} title={f.reason}><RocketV27 size={13} />{f.status === "virou" ? `Virou ${br(f.forecast)}` : `Go-live previsto ${br(f.forecast)}${f.promised ? ` · prometido ${br(f.promised)}` : ""}`}</span> : null; })()}</div></div>
         <button className="v7-x" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
       </header>
       <nav className="v14-tabs" role="tablist" aria-label="Seções do projeto">

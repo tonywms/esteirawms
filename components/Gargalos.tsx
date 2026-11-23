@@ -10,6 +10,7 @@ import { avatarUrl } from "@/lib/avatars";
 import { PersonPhoto } from "./PersonPhoto";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import CompletarAgora from "./CompletarAgora";
+import { snapshotRows, type Snap } from "@/lib/evolucao";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onOpen: (p: Project) => void; onNavigate: (path: string) => void };
 const VIEWS: { key: GroupBy; label: string }[] = [{ key: "fase", label: "Fase" }, { key: "consultor", label: "Consultor" }, { key: "cliente", label: "Cliente" }, { key: "onda", label: "Onda" }];
@@ -21,6 +22,18 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
   const [sel, setSel] = useState<{ row: string; dim: DimKey } | null>(null);
   const [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null);
   const [bulk, setBulk] = useState(false); // V24
+  // V27 · Tendência: saúde média de cada linha hoje × 7 dias atrás (fotos diárias da Evolução)
+  const [past, setPast] = useState<{ day: string; rows: Snap[] } | null>(null);
+  useEffect(() => {
+    fetch("/api/evolucao?dias=21", { cache: "no-store" }).then(r => r.json()).then((j: { today?: string; rows?: (Snap & { est?: boolean })[] }) => {
+      const real = (j.rows || []).filter(r => !r.est), today = j.today || todayISO();
+      const lim = new Date(new Date(today + "T12:00:00").getTime() - 7 * 864e5).toISOString().slice(0, 10);
+      const lim3 = new Date(new Date(today + "T12:00:00").getTime() - 3 * 864e5).toISOString().slice(0, 10);
+      const days = [...new Set(real.map(r => r.day))].sort();
+      const day = days.filter(d => d <= lim).pop() || days.filter(d => d <= lim3)[0];
+      if (day) setPast({ day, rows: real.filter(r => r.day === day) });
+    }).catch(() => {});
+  }, []);
   useEffect(() => { // /gargalos?fase=dev abre o mapa já na fase
     const f = new URLSearchParams(window.location.search).get("fase");
     if (f && PHASES.some(p => p.key === f)) { setBy("fase"); setSel({ row: f, dim: "meta" }); }
@@ -30,6 +43,15 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
   const attack = useMemo(() => attackFirst(map.heats), [map.heats]);
   const times = useMemo(() => phaseTimes(data, map.heats), [data, map.heats]);
   const dq = useMemo(() => dataQuality(data, map.heats), [data, map.heats]);
+  const trend = useMemo(() => {
+    if (!past) return null;
+    const keyOf = (r: Snap) => by === "fase" ? r.phase : by === "consultor" ? r.owner : by === "onda" ? r.wave : r.client_id;
+    const avg = (rows: Snap[]) => { const m = new Map<string, { s: number; n: number }>(); for (const r of rows) { if (r.phase === "fim") continue; const k = keyOf(r), v = m.get(k) || { s: 0, n: 0 }; v.s += Number(r.health) || 0; v.n++; m.set(k, v); } return m; };
+    const now = avg(snapshotRows(data)), then = avg(past.rows), out = new Map<string, { d: number; a: number; b: number; na: number; nb: number }>();
+    for (const [k, v] of now) { const t = then.get(k); if (t && t.n) out.set(k, { d: Math.round(v.s / v.n - t.s / t.n), a: Math.round(t.s / t.n), b: Math.round(v.s / v.n), na: t.n, nb: v.n }); }
+    let sa = 0, na = 0, sb = 0, nb = 0; for (const v of then.values()) { sa += v.s; na += v.n; } for (const v of now.values()) { sb += v.s; nb += v.n; }
+    return { rows: out, day: past.day, all: na && nb ? { a: Math.round(sa / na), b: Math.round(sb / nb) } : null };
+  }, [past, data, by]);
 
   // seleção padrão: a célula mais quente
   const current = useMemo(() => {
@@ -90,13 +112,13 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
 
     <div className="v17-main">
       <section className="v17-panel v17-heat">
-        <header><h2>Mapa de calor · {TITLE[by]}</h2><small>Clique numa célula para ver os projetos</small></header>
+        <header><h2>Mapa de calor · {TITLE[by]}</h2><small>Clique numa célula para ver os projetos{trend?.all ? <> · <span className={`v27-trend ${trend.all.b - trend.all.a >= 3 ? "up" : trend.all.b - trend.all.a <= -3 ? "down" : "flat"}`} title="Saúde média de todos os projetos ativos (0 a 100)">saúde geral {trend.all.a} → {trend.all.b} desde {trend.day.split("-").reverse().slice(0, 2).join("/")}</span></> : <> · tendência aparece com 7 dias de fotos</>}</small></header>
         <div className="v17-grid-wrap">
           <div className="v17-grid" style={{ gridTemplateColumns: `minmax(150px,1.3fr) repeat(${DIMS.length}, minmax(86px,1fr))` }}>
             <span />
             {DIMS.map(d => <span key={d.key} className="v17-colh"><b>{d.label}</b><small>{d.sub}</small></span>)}
             {map.rows.map(r => <div key={r.key} className="v17-row" style={{ display: "contents" }}>
-              <span className={`v17-rowh ${by === "consultor" && avatarUrl(r.label) ? "v19-rowh" : ""}`}>{by === "consultor" && <PersonPhoto name={r.label} size={30} />}<span><b title={r.label}>{r.label}</b><small>{r.sub}</small></span></span>
+              <span className={`v17-rowh ${by === "consultor" && avatarUrl(r.label) ? "v19-rowh" : ""}`}>{by === "consultor" && <PersonPhoto name={r.label} size={30} />}<span><b title={r.label}>{r.label}</b><small>{r.sub}{(() => { const t = trend?.rows.get(r.key); if (!t) return null; const c = t.d >= 3 ? "up" : t.d <= -3 ? "down" : "flat"; return <i className={`v27-trend ${c}`} title={`Saúde média ${t.a} → ${t.b} desde ${trend!.day.split("-").reverse().join("/")} (${t.na} → ${t.nb} projetos)`}>{c === "up" ? "▲" : c === "down" ? "▼" : "■"} {t.d > 0 ? `+${t.d}` : t.d}</i>; })()}</small></span></span>
               {DIMS.map(d => { const c = r.cells[d.key]; const on = current?.row === r.key && current?.dim === d.key;
                 return <button key={d.key} type="button" className={`v17-cell l${c.level} ${on ? "on" : ""}`} disabled={!c.hits.length && !c.missing.length && c.level === 0} aria-label={`${r.label}, ${d.label}: ${c.text} (${LEVEL[c.level]})`} onClick={() => setSel({ row: r.key, dim: d.key })}><b>{c.text}</b><small>{c.sub}</small></button>; })}
             </div>)}
