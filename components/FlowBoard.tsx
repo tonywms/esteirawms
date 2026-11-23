@@ -9,6 +9,7 @@ import { BALL, PHASES, ballOf, canMove, docOf, docResolved, docStates, flowSumma
 import type { PhaseDoc } from "@/lib/types";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import MasterDialog, { type MasterBox } from "./MasterDialog";
+import NextActionDialog, { type NextAction } from "./NextActionDialog";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
 import SignDialog, { type SignTarget } from "./SignDialog";
@@ -134,6 +135,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(setMe).catch(() => setMe(null)); }, []);
   const [masterBox, setMasterBox] = useState<MasterBox | null>(null), [escalate, setEscalate] = useState(false), [report, setReport] = useState(false), [signTarget, setSignTarget] = useState<SignTarget | null>(null);
   const [tlKind, setTlKind] = useState(""), [tlAll, setTlAll] = useState(false);
+  const [nextBox, setNextBox] = useState<{ to: PhaseKey; free: boolean } | null>(null); // V24
   const [tab, setTab] = useState<"resumo" | "docs" | "hist" | "acoes">("resumo");
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { fetch("/api/auth", { cache: "no-store" }).then(r => r.json()).then(j => { setMeName(j.name || ""); setMeEmail(j.email || ""); }).catch(() => {}); }, []);
@@ -182,7 +184,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
       } });
   }
   const client = clientName(data, p.clientId);
-  const openMaster = (action: MasterBox["action"], phase?: PhaseKey) => setMasterBox({ trusted: (action === "advance" || action === "waive" ? me?.releaser : me?.master) && me?.email ? { name: me.name, email: me.email } : null, action, projectId: p.id, client, current: PHASES[idx].short, phase, phaseLabel: phase ? PHASES.find(x => x.key === phase)?.doc : undefined, options: nextOptions.map(k2 => ({ key: k2, label: PHASES[phaseIndex(k2)].short })), defaultEmail: meEmail });
+  const openMaster = (action: MasterBox["action"], phase?: PhaseKey) => setMasterBox({ trusted: (action === "advance" || action === "waive" ? me?.releaser : me?.master) && me?.email ? { name: me.name, email: me.email } : null, action, projectId: p.id, client, current: PHASES[idx].short, phase, phaseLabel: phase ? PHASES.find(x => x.key === phase)?.doc : undefined, options: nextOptions.map(k2 => ({ key: k2, label: PHASES[phaseIndex(k2)].short })), defaultEmail: meEmail, owners: [...new Set([phaseOwner(p, nextOptions[0] || k), ...owners])] });
   async function syncSign(k2: PhaseKey) {
     setBusy("sync");
     try {
@@ -214,7 +216,16 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
       await onRefresh(); flash("Salvo");
     } catch (e) { flash(e instanceof Error ? e.message : "Falha ao salvar", true); } finally { setBusy(""); }
   }
-  const move = (to: PhaseKey) => save("move", movePhasePatch(p, to));
+  // V24: mudar de fase exige a próxima ação (o quê, quem, até quando); Encerrado não precisa
+  const move = (to: PhaseKey) => (to === "fim" ? save("move", movePhasePatch(p, to)) : setNextBox({ to, free: false }));
+  async function confirmMove(to: PhaseKey, free: boolean, n: NextAction) {
+    if (free) { setMasterBox({ trusted: me?.email ? { name: me.name, email: me.email } : null, action: "advance", projectId: p.id, client, current: PHASES[idx].short, options: [{ key: to, label: PHASES[phaseIndex(to)].short }], next: n }); return; }
+    setBusy("move"); setMsg("");
+    try {
+      await patchProject(p.id, { ...movePhasePatch(p, to, meName || "Equipe"), ...n, lastMovement: todayISO() });
+      await onRefresh(); flash(`Movido para ${PHASES[phaseIndex(to)].short} · próxima ação definida`);
+    } finally { setBusy(""); }
+  }
   const setPhaseOwner = (owner: string) => save("owner", { phases: { ...(p.phases || {}), [k]: { ...(p.phases?.[k] || {}), owner, start: p.phases?.[k]?.start || phaseSince(p, k) } } });
   const setPhaseDue = (due: string) => save("due", { phases: { ...(p.phases || {}), [k]: { ...(p.phases?.[k] || {}), owner: phaseOwner(p, k), start: p.phases?.[k]?.start || phaseSince(p, k), due: due || null } } });
 
@@ -254,7 +265,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
             <button className="btn outline" disabled={idx === 0 || !!busy} onClick={() => void move(PHASES[idx - 1].key)}><ArrowLeft size={15} /> Voltar fase</button>
             {nextOptions.map(to => { const g = canMove(p, to); const skip = k === "homolog" && to === "golive";
               const free = !g.ok && !!me?.releaser; // V22.3: master/liberador avança sem PDF (com motivo)
-              return <button key={to} className={`btn ${skip ? "outline v7-skip" : "primary"} ${free ? "v22-free" : ""}`} disabled={(!g.ok && !free) || !!busy} title={free ? "Você pode liberar: avança sem o PDF, registrando o motivo" : g.reason} onClick={() => (free ? setMasterBox({ trusted: me?.email ? { name: me.name, email: me.email } : null, action: "advance", projectId: p.id, client, current: PHASES[idx].short, options: [{ key: to, label: PHASES[phaseIndex(to)].short }] }) : void move(to))}>{busy === "move" ? <RefreshCw className="spin" size={15} /> : skip ? <SkipForward size={15} /> : null}{skip ? "Pular para Go-live" : `Avançar para ${PHASES[phaseIndex(to)].short}`}{!skip && <ArrowRight size={15} />}</button>; })}
+              return <button key={to} className={`btn ${skip ? "outline v7-skip" : "primary"} ${free ? "v22-free" : ""}`} disabled={(!g.ok && !free) || !!busy} title={free ? "Você pode liberar: avança sem o PDF, registrando o motivo" : g.reason} onClick={() => (free ? (to === "fim" ? setMasterBox({ trusted: me?.email ? { name: me.name, email: me.email } : null, action: "advance", projectId: p.id, client, current: PHASES[idx].short, options: [{ key: to, label: PHASES[phaseIndex(to)].short }] }) : setNextBox({ to, free: true })) : void move(to))}>{busy === "move" ? <RefreshCw className="spin" size={15} /> : skip ? <SkipForward size={15} /> : null}{skip ? "Pular para Go-live" : `Avançar para ${PHASES[phaseIndex(to)].short}`}{!skip && <ArrowRight size={15} />}</button>; })}
           </div>
           {nextOptions.length > 0 && !canMove(p, nextOptions[0]).ok && <div className={`v7-gate ${p.phases?.[k]?.sign?.status === "pending" ? "zs" : ""}`}>{p.phases?.[k]?.sign?.status === "pending" ? <PenLine size={18} /> : <FileX2 size={18} />}<span>{p.phases?.[k]?.sign?.status === "pending" ? `Aguardando o cliente assinar na ZapSign (${p.phases[k]!.sign!.signers.filter(x => x.status === "signed").length}/${p.phases[k]!.sign!.signers.length}). O avanço é liberado quando o PDF assinado chegar.` : canMove(p, nextOptions[0]).reason}</span>{PHASES[idx].doc && !p.phases?.[k]?.sign?.status?.startsWith("pend") && <button type="button" onClick={() => pickFile(k)} disabled={!!busy}><Upload size={14} /> Anexar agora</button>}{PHASES[idx].doc && !p.phases?.[k]?.sign && <button type="button" className="v13-gate-zs" onClick={() => setSignTarget({ kind: "phase", projectId: p.id, phase: k, docLabel: PHASES[idx].doc, client: data.clients.find(c => c.id === p.clientId) })} disabled={!!busy}><PenLine size={14} /> Enviar p/ assinatura</button>}<button type="button" className="v9-master-btn" onClick={() => openMaster("advance")} disabled={!!busy} title="Usuário master libera o avanço sem o PDF"><ShieldCheck size={14} /> {me?.releaser ? "Liberar sem PDF" : "Liberar (master)"}</button></div>}
         </section>
@@ -364,6 +375,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
       </footer>
     </aside>
     {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}
+    {nextBox && <NextActionDialog client={client} from={PHASES[idx].short} to={PHASES[phaseIndex(nextBox.to)].short} toKey={nextBox.to} owners={owners} defaultOwner={phaseOwner({ ...p, phase: nextBox.to }, nextBox.to)} current={{ nextAction: p.nextAction }} confirmLabel={nextBox.free ? "Continuar para a liberação" : undefined} onClose={() => setNextBox(null)} onConfirm={n => confirmMove(nextBox.to, nextBox.free, n)} />}
     {masterBox && <MasterDialog box={masterBox} onClose={() => setMasterBox(null)} onDone={async msg => { await onRefresh(); flash(msg); if (masterBox.action === "cancel" || masterBox.action === "close") window.setTimeout(onClose, 900); }} />}
     {signTarget && <SignDialog target={signTarget} onClose={() => setSignTarget(null)} onDone={async msg => { await onRefresh(); flash(msg); }} />}
     {report && <ReportDialog data={data} project={p} client={client} onClose={() => setReport(false)} onDone={async msg => { await onRefresh(); flash(msg); }} />}

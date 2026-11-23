@@ -6,7 +6,7 @@ import { currentUser, isMasterEmail, isReleaserEmail, verifyMaster } from "@/lib
 import type { DocWaiver, PhaseInfo, State } from "@/lib/types";
 export const runtime = "nodejs";
 
-type Body = { projectId?: string; action?: "advance" | "waive" | "close" | "cancel"; to?: string; phase?: string; reason?: string; email?: string; password?: string; trusted?: boolean };
+type Body = { projectId?: string; action?: "advance" | "waive" | "close" | "cancel"; to?: string; phase?: string; reason?: string; email?: string; password?: string; trusted?: boolean; nextAction?: string; nextActionOwner?: string; nextActionDue?: string | null };
 const DOC_KEYS = PHASES.filter(p => p.doc).map(p => p.key as string);
 
 export async function POST(req: Request) {
@@ -44,6 +44,12 @@ export async function POST(req: Request) {
         for (const ph of PHASES) { const i = phaseIndex(ph.key); if (i >= ci && i < ti && !(ph.key === "campo" && cur !== "campo")) waive(ph.key); }
         p.phases = phases;
         Object.assign(p, movePhasePatch(p, to, m.name));
+        // V24: a fase nova já nasce com a próxima ação
+        if (to !== "fim") {
+          const na = (b.nextAction || "").trim();
+          if (!na) throw new Error("Ao mudar de fase, informe a próxima ação (o que precisa acontecer, quem faz e até quando).");
+          Object.assign(p, { nextAction: na, nextActionOwner: (b.nextActionOwner || "").trim(), nextActionDue: b.nextActionDue || null });
+        }
         text = `Liberação master (${m.name}): avançou de ${phaseLabel(cur)} para ${phaseLabel(to)} sem PDF. Motivo: ${reason}${by}`;
       } else if (b.action === "close") {
         waive(cur); p.phases = phases;

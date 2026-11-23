@@ -9,6 +9,7 @@ import { todayISO } from "@/lib/metrics";
 import { avatarUrl } from "@/lib/avatars";
 import { PersonPhoto } from "./PersonPhoto";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
+import CompletarAgora from "./CompletarAgora";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onOpen: (p: Project) => void; onNavigate: (path: string) => void };
 const VIEWS: { key: GroupBy; label: string }[] = [{ key: "fase", label: "Fase" }, { key: "consultor", label: "Consultor" }, { key: "cliente", label: "Cliente" }, { key: "onda", label: "Onda" }];
@@ -19,6 +20,7 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
   const [by, setBy] = useState<GroupBy>("fase");
   const [sel, setSel] = useState<{ row: string; dim: DimKey } | null>(null);
   const [confirmBox, setConfirmBox] = useState<ConfirmBox | null>(null);
+  const [bulk, setBulk] = useState(false); // V24
   useEffect(() => { // /gargalos?fase=dev abre o mapa já na fase
     const f = new URLSearchParams(window.location.search).get("fase");
     if (f && PHASES.some(p => p.key === f)) { setBy("fase"); setSel({ row: f, dim: "meta" }); }
@@ -132,6 +134,7 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
         <section className="v17-panel v17-dq">
           <header><h2><Database size={16} /> Qualidade dos dados</h2><small>O mapa só é confiável com a esteira alimentada</small></header>
           <div className="row"><span>Projetos sem próxima ação</span><b className={dq.noNext ? "bad" : "good"}>{dq.noNext} de {dq.total}</b></div>
+          {dq.noNext > 0 && <button type="button" className="v17-link v24-complete" onClick={() => setBulk(true)}>Completar agora <ArrowRight size={14} /></button>}
           <div className="row"><span>Atividades abertas sem prazo</span><b className={dq.noDue ? "warn" : "good"}>{dq.noDue}</b></div>
           <div className="row"><span>Fase atual sem data de início</span><b className={dq.noStart ? "warn" : "good"}>{dq.noStart}</b></div>
           {dq.noStart > 0 && <button type="button" className="v17-link" onClick={() => startClock(dq.noStartList)}>Começar a contar a meta hoje <ArrowRight size={14} /></button>}
@@ -155,5 +158,6 @@ export default function Gargalos({ data, onRefresh, onOpen, onNavigate }: Props)
       <p className="v17-foot"><AlertTriangle size={13} /> A linha escura marca o limite da fase; na Implantação a faixa clara é a tolerância (5 a 10 dias úteis). Kickoff/endereçamento: {PHASE_GOALS.kickoff.text}.</p>
     </section>
     {confirmBox && <ConfirmDialog box={confirmBox} onClose={() => setConfirmBox(null)} />}
+    {bulk && <CompletarAgora data={data} list={dq.noNextList} onClose={() => setBulk(false)} onSaved={onRefresh} />}
   </div>;
 }

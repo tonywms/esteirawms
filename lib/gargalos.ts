@@ -212,6 +212,7 @@ export function dataQuality(s: State, heats: ProjectHeat[], today = todayISO()) 
   const openTasks = s.tasks.filter(t => ids.has(t.projectId) && !/conclu|finaliz|cancel/i.test(t.status));
   return {
     noNext: heats.filter(h => !h.nextAction).length,
+    noNextList: heats.filter(h => !h.nextAction), // V24
     noDue: openTasks.filter(t => !t.dueDate).length,
     noStart: heats.filter(h => h.noStart).length,
     noStartList: heats.filter(h => h.noStart),

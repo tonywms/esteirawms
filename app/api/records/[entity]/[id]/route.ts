@@ -1,6 +1,7 @@
 import {audit,isEntity,problem,transact,validate} from "@/lib/storage";
 import {passwordsAvailable,setUserPassword} from "@/lib/user-password";
-import type {State} from "@/lib/types";
+import type {Project,State} from "@/lib/types";
+import {phaseOf} from "@/lib/flow";
 import {logRecord} from "@/lib/activity-log";
 import {currentUser} from "@/lib/master";
 export const runtime="nodejs";
@@ -20,6 +21,8 @@ export async function PATCH(request:Request,context:C){
    if(entity==="projects")value.system=state.clients.find(c=>c.id===value.clientId)?.system||"";
    // V13: o estado da ZapSign é do servidor (webhook) — uma tela desatualizada não pode apagá-lo
    if(entity==="projects"&&value.phases&&row.phases){const rp=row.phases as Record<string,{sign?:unknown;doc?:{uploadedBy?:string}|null}>,vp={...(value.phases as Record<string,Record<string,unknown>>)};for(const k of Object.keys(rp)){if(rp[k]?.sign!==undefined){vp[k]={...(vp[k]||{}),sign:rp[k].sign};if(rp[k]?.doc?.uploadedBy==="ZapSign"&&vp[k].doc===undefined)vp[k].doc=rp[k].doc}}value.phases=vp}
+   // V24: mudou de fase (exceto para Encerrado) → precisa sair com a próxima ação definida
+   if(entity==="projects"&&patch.phase&&phaseOf({...row,phase:patch.phase} as unknown as Project)!==phaseOf(row as unknown as Project)&&patch.phase!=="fim"&&!String(patch.nextAction||"").trim())throw new Error("Ao mudar de fase, informe a próxima ação (o que precisa acontecer, quem faz e até quando).");
    const issue=validate(entity,value,state,id);if(issue)throw new Error(issue);
    if(entity==="clients"){
     const oldName=String(row.name||"");

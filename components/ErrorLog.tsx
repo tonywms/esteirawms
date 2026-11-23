@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertOctagon, AlertTriangle, Bug, CheckCircle2, ChevronDown, ClipboardCopy, Copy, Layers, RefreshCw, RotateCcw, Search, ShieldAlert } from "lucide-react";
 import { errorText } from "@/lib/report-error";
 import { PersonPhoto } from "./PersonPhoto";
+import Rotinas from "./Rotinas"; // V24
 
 type Err = { id: string; at: string; level: "erro" | "aviso"; source: string; page?: string; action?: string; status?: number | null; message: string; detail?: string; context?: Record<string, unknown> | null; userName?: string; userEmail?: string; resolvedAt?: string | null; resolvedBy?: string | null; note?: string | null };
 const code = (id: string) => `E-${id.replace(/[^a-z0-9]/gi, "").slice(0, 6).toUpperCase()}`;
@@ -56,6 +57,7 @@ export default function ErrorLog() {
         <button className="btn primary v4-primary-action" disabled={!filtered.length} onClick={() => copy(rows.slice(0, 30).map(r => textOf(r.items)).join("\n\n———\n\n"), `${Math.min(rows.length, 30)} erro(s) copiado(s) — cole no chat para correção`)}><ClipboardCopy size={16} /> Copiar lista para correção</button>
       </div>
     </div>
+    <Rotinas />
     <section className="v22-kpis">
       <div className="v22-kpi red"><span><AlertOctagon size={18} /></span><div><strong>{openErr}</strong><em>Erros em aberto</em></div></div>
       <div className="v22-kpi amber"><span><AlertTriangle size={18} /></span><div><strong>{openWarn}</strong><em>Avisos em aberto (validação)</em></div></div>
