@@ -1,5 +1,5 @@
 export type Source = {sheet: string; row: number};
-export type Client = {id:string;name:string;system:string;notes:string;createdAt:string;updatedAt:string;source?:Source;signers?:ClientSigner[]};
+export type Client = {id:string;name:string;system:string;notes:string;createdAt:string;updatedAt:string;source?:Source;signers?:ClientSigner[];info?:ClientInfo};
 export type ClientSigner = {id:string;name:string;email:string;phone?:string;role?:string;primary?:boolean};
 /* WMS_ESTEIRA_V13_1 */
 export type SignRequest = {provider:"zapsign";docToken:string;status:"pending"|"signed"|"refused";sentAt:string;sentBy?:string;fileName:string;originalPath?:string;signers:{name:string;email?:string;status:string;signUrl?:string;signedAt?:string|null}[];completedAt?:string|null}; /* WMS_ESTEIRA_V13 */
@@ -10,7 +10,11 @@ export type PhaseInfo = {owner?:string;start?:string|null;due?:string|null;done?
 export type DocWaiver = {by:string;email:string;at:string;reason:string}; /* WMS_ESTEIRA_V8_1 */
 export type Project = {id:string;clientId:string;name:string;system:string;wave:string;stage:string;progress:number;status:string;team:string;integrationOwner:string;implementationOwner:string;blocker:string;readiness:Readiness;lastMovement:string|null;initialMilestone:string|null;integrationDelivery:string|null;homologationDate:string|null;goLiveDate:string|null;implementationStart:string|null;notes:string;createdAt:string;updatedAt:string;source?:Source;
  /* V7 · esteira por fases (opcionais: projetos antigos sao derivados automaticamente) */
- phase?:string;phases?:Record<string,PhaseInfo>;ballWith?:string;nextAction?:string;nextActionOwner?:string;nextActionDue?:string|null;timeline?:TimelineEvent[];archivedAt?:string|null;extraDocs?:ExtraDoc[];infra?:InfraCheck};
+ phase?:string;phases?:Record<string,PhaseInfo>;ballWith?:string;nextAction?:string;nextActionOwner?:string;nextActionDue?:string|null;timeline?:TimelineEvent[];archivedAt?:string|null;extraDocs?:ExtraDoc[];infra?:InfraCheck;schedule?:ProjectSchedule};
+export type ClientPerson = {name:string;email?:string;phone?:string;role?:string};
+export type ClientInfo = {legalName?:string;tradeName?:string;cnpj?:string;sponsor?:ClientPerson;keyUsers?:ClientPerson[];itSupport?:ClientPerson;city?:string};
+export type ScheduleRow = {id:string;group:string;phase:string;activity:string;expert:string;expertHrs?:string;expertPerson?:string;client:string;clientHrs?:string;clientPeople?:string[];start?:string|null;end?:string|null;highlight?:boolean;continuous?:boolean;done?:boolean};
+export type ProjectSchedule = {rows:ScheduleRow[];updatedAt?:string;updatedBy?:string;consultant?:string}; /* WMS_ESTEIRA_V29 */
 export type InfraItem = {id:string;label:string;status?:string;note?:string;kind?:string;owner?:string;due?:string|null;at?:string;by?:string};
 export type InfraCheck = {items?:Record<string,InfraItem>;extra?:InfraItem[];validatedAt?:string|null;validatedBy?:string|null;validatedPhase?:string|null}; /* WMS_ESTEIRA_V28 */
 export type ExtraDoc = {id:string;title:string;name:string;path:string;size?:number;uploadedAt:string;uploadedBy?:string;sign?:SignRequest|null;signed?:{path:string;name:string;size?:number;uploadedAt:string}|null;manual?:{by?:string;at:string;signedAt?:string|null;taskId?:string|null;note?:string;pages?:number}|null}; /* WMS_ESTEIRA_V20 */ /* WMS_ESTEIRA_V25 */

@@ -214,7 +214,18 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
     } catch (e) { flash(e instanceof Error ? e.message : "Falha ao salvar", true); } finally { setBusy(""); }
   }
   // V24: mudar de fase exige a próxima ação (o quê, quem, até quando); Encerrado não precisa
-  const move = (to: PhaseKey) => (to === "fim" ? save("move", movePhasePatch(p, to)) : setNextBox({ to, free: false }));
+  const move = (to: PhaseKey) => {
+    if (to === "fim") return save("move", movePhasePatch(p, to));
+    // V28.1: voltar de fase pede confirmação — muita gente volta só para anexar o PDF de uma fase anterior
+    if (phaseIndex(to) < idx) return setConfirmBox({
+      title: `Voltar ${client} para ${PHASES[phaseIndex(to)].short}?`,
+      message: "Para anexar o documento de uma fase anterior NÃO precisa voltar: abra a aba Documentos e use “Anexar PDF ou foto” na fase. Voltar de fase reinicia a contagem da fase, conta como retrabalho no Mapa de gargalos e muda a previsão de go-live.",
+      details: [{ label: "Fase atual", value: PHASES[idx].short }, { label: "Vai para", value: PHASES[phaseIndex(to)].short }],
+      confirmLabel: "Voltar mesmo assim", cancelLabel: "Não voltar", tone: "info",
+      onConfirm: () => { setNextBox({ to, free: false }); },
+    });
+    setNextBox({ to, free: false });
+  };
   async function confirmMove(to: PhaseKey, free: boolean, n: NextAction) {
     if (free) { setMasterBox({ trusted: me?.email ? { name: me.name, email: me.email } : null, action: "advance", projectId: p.id, client, current: PHASES[idx].short, options: [{ key: to, label: PHASES[phaseIndex(to)].short }], next: n }); return; }
     setBusy("move"); setMsg("");

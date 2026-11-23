@@ -3,7 +3,7 @@
 export type Profile = "Administrador" | "Gestor" | "Analista" | "Consultor" | "Visualizador" | "Painel";
 export const PROFILES: Profile[] = ["Administrador", "Gestor", "Analista", "Consultor", "Visualizador", "Painel"];
 
-const ALL = ["/", "/minha-semana", "/esteira", "/gargalos", "/evolucao", "/previsao", "/clientes", "/projetos", "/atividades", "/integracoes", "/implantacao", "/agenda", "/equipe", "/relatorios", "/configuracoes", "/usuarios", "/erros"];
+const ALL = ["/", "/minha-semana", "/esteira", "/gargalos", "/evolucao", "/previsao", "/raio-x", "/clientes", "/projetos", "/atividades", "/integracoes", "/implantacao", "/agenda", "/equipe", "/relatorios", "/configuracoes", "/usuarios", "/erros"];
 const SEM_ADMIN = ALL.filter(p => p !== "/configuracoes" && p !== "/usuarios"); // Inteligência: somente Relatórios
 
 /** Telas que cada perfil enxerga no menu e pode abrir. */

@@ -8,7 +8,8 @@ import { attackFirst, gargalosSummary, heatmap, businessDays } from "./gargalos"
 import { snapshotRows, type Snap } from "./evolucao";
 import { isDone } from "./metrics";
 import { masterEmails } from "./master";
-import { forecastAll } from "./forecast";
+import { forecastAll, paceByOwner } from "./forecast";
+import { raioX } from "./raiox";
 import { infraSummary, pendText } from "./infra";
 
 export type AlertKind = "task-late" | "task-tomorrow" | "idle" | "phase-due" | "phase-late" | "next-late" | "next-missing" | "infra";
@@ -92,10 +93,10 @@ function shell(title: string, intro: string, body: string, appUrl: string, cta =
 </div><p style="font-size:11px;color:#7a8799;text-align:center;margin-top:14px">E-mail automático da rotina das 7h. Para parar de receber, atualize a esteira — os alertas somem quando o item é resolvido.</p></div></body></html>`;
 }
 
-export function dailyMail(name: string, alerts: Alert[], today: string, appUrl: string): Omit<Mail, "to"> {
+export function dailyMail(name: string, alerts: Alert[], today: string, appUrl: string, paceLine = ""): Omit<Mail, "to"> {
   const first = name.split(/\s+/)[0];
   const groups = ORDER.map(k => ({ k, items: alerts.filter(a => a.kind === k) })).filter(g => g.items.length);
-  const body = groups.map(g => `<h3 style="font-size:13px;margin:16px 0 6px;color:#0b2a4a">${KIND_LABEL[g.k]} (${g.items.length})</h3>` +
+  const body = (paceLine ? `<p style="margin:0 0 6px;padding:8px 10px;border-radius:8px;background:#eef8fb;font-size:12.5px;color:#0b4f63">${paceLine}</p>` : "") + groups.map(g => `<h3 style="font-size:13px;margin:16px 0 6px;color:#0b2a4a">${KIND_LABEL[g.k]} (${g.items.length})</h3>` +
     g.items.map(a => `<div style="padding:8px 10px;border-left:3px solid ${DOT[a.sev]};background:#f7f9fc;margin:0 0 6px;border-radius:0 8px 8px 0;font-size:13px"><b>${esc(a.project)}</b><br>${esc(a.text)}</div>`).join("")).join("");
   const late = alerts.filter(a => a.sev === 3).length;
   const subject = `Esteira · ${br(today)} · ${alerts.length} ponto(s) para você${late ? ` (${late} vencido/parado)` : ""}`;
@@ -105,11 +106,15 @@ export function dailyMail(name: string, alerts: Alert[], today: string, appUrl: 
 
 /** Monta todos os e-mails da rotina diária. Quem não tem e-mail cadastrado vai para os masters. */
 export function buildDaily(s: State, today: string, appUrl: string) {
-  const alerts = dailyAlerts(s, today), find = emailDirectory(s);
+  const alerts = dailyAlerts(s, today), find = emailDirectory(s), pace = paceByOwner(s, today);
   const mails: Mail[] = [], orphan: { name: string; alerts: Alert[] }[] = [];
   for (const [name, list] of alerts) {
     const email = find(name);
-    if (email) mails.push({ ...dailyMail(name, list, today, appUrl), to: [email] });
+    if (email) {
+      const pc = pace.of(name); // V29: ritmo da pessoa x equipe
+      const paceLine = pc.n >= 2 ? `Seu ritmo nas fases concluídas: <b>${pc.ratio.toFixed(1).replace(".", ",")}× a meta</b> (equipe: ${pace.global.toFixed(1).replace(".", ",")}×). ${pc.ratio <= pace.global ? "Acima da média da equipe. 👏" : "Abaixo da média da equipe — vale olhar os parados."}` : "";
+      mails.push({ ...dailyMail(name, list, today, appUrl, paceLine), to: [email] });
+    }
     else orphan.push({ name, alerts: list });
   }
   if (orphan.length) {
@@ -120,7 +125,12 @@ export function buildDaily(s: State, today: string, appUrl: string) {
       text: orphan.map(o => `${o.name}:\n` + o.alerts.map(a => ` - ${a.project}: ${a.text}`).join("\n")).join("\n\n"),
       html: shell("Alertas sem destinatário", `Estes responsáveis não têm e-mail cadastrado na <b>Equipe</b> (ou o nome não bate). Cadastre o e-mail para eles receberem direto.`, body, appUrl) });
   }
-  return { mails, people: alerts.size, total: [...alerts.values()].reduce((a, l) => a + l.length, 0), orphans: orphan.map(o => o.name) };
+  // V29: sobrecarga — quem passou de 100% da capacidade de turnos na semana
+  const over = raioX(s, [], [], 30, today).consultants.filter(c => c.loadPct !== null && c.loadPct > 100);
+  if (over.length) mails.push({ to: masterEmails(), name: "Sobrecarga", count: over.length, subject: `Esteira · ${br(today)} · ${over.length} consultor(es) acima da capacidade`,
+    text: over.map(c => `${c.name}: ${c.slots} turnos agendados para ${c.cap} de capacidade (${c.loadPct}%)`).join("\n"),
+    html: shell("Consultores acima da capacidade", "A agenda desta semana passou da capacidade cadastrada em Equipe & capacidade. Redistribua ou ajuste a capacidade.", over.map(c => `<div style="padding:8px 10px;border-left:3px solid #e5484d;background:#f7f9fc;margin:0 0 6px;font-size:13px"><b>${esc(c.name)}</b>: ${c.slots} turnos agendados · capacidade ${c.cap} · <b>${c.loadPct}%</b></div>`).join(""), `${appUrl}/raio-x`, "Abrir o Raio-X") });
+  return { mails, people: alerts.size, total: [...alerts.values()].reduce((a, l) => a + l.length, 0), orphans: orphan.map(o => o.name), sobrecarga: over.length };
 }
 
 /** Resumo semanal (segunda-feira): gargalos, atacar primeiro, quem andou/parou na semana, atividades vencidas. */
@@ -151,6 +161,14 @@ export function buildWeekly(s: State, today: string, appUrl: string, weekAgo: Sn
     `<table role="presentation" style="width:100%;border-spacing:6px"><tr>${kpi(String(sum.active), "projetos ativos")}${kpi(String(sum.red), "críticos", sum.red ? "#e5484d" : "#2fbf71")}${kpi(sum.pctInGoal === null ? "—" : `${sum.pctInGoal}%`, "dentro da meta")}${kpi(sum.cycle.avg === null ? "—" : `${sum.cycle.avg}d`, "ciclo médio (úteis)")}</tr></table>` +
     (sum.worst ? `<p style="font-size:13px;margin:12px 0 0">Maior gargalo agora: <b>${esc(sum.worst.label)}</b>${sum.hot.length ? ` — ${sum.hot.map(h => `${esc(h.row)} · ${esc(h.dim)}: ${esc(h.text)}`).join("; ")}` : ""}.</p>` : "") +
     sec("Atacar primeiro", attack.length ? attack.map((a, i) => row(`<b>${i + 1}. ${esc(a.h.client)}</b> · ${esc(ph(a.h.phase))} · ${esc(a.h.owner)}`, `${esc(a.problem)} → ${esc(a.next)}`, i < 2 ? "#e5484d" : "#f2994a")).join("") : row("Nenhum projeto com problema relevante.", "", "#2fbf71")) +
+    (() => { // V29: ranking da semana
+      const byOwner = new Map<string, number>(); for (const x of moves) if ((x.d as number) > 0 || x.phaseChanged) byOwner.set(x.r.owner, (byOwner.get(x.r.owner) || 0) + Math.max(0, x.d as number) + (x.phaseChanged ? 10 : 0));
+      const best = [...byOwner.entries()].filter(([o]) => !/^(a definir|não definido|nao definido)$/i.test(o)).sort((a, b) => b[1] - a[1])[0];
+      const rx = raioX(s, weekAgo, weekAgo, 7, today), worst = rx.clients[0];
+      const items = [best ? row(`🏆 <b>Quem mais fez andar:</b> ${esc(best[0])}`, `${best[1]} pontos de avanço nos projetos em que é dono da fase (mudança de fase vale 10)`, "#2fbf71") : "",
+        worst ? row(`⚠️ <b>Cliente que mais travou:</b> ${esc(worst.name)} · risco ${worst.risk}/100`, esc(worst.why.join(" · ")), "#e5484d") : ""].join("");
+      return items ? sec("Ranking da semana", items) : "";
+    })() +
     sec("Quem andou na semana", weekAgo.length ? (up.length ? up.map(x => row(`<b>${esc(name(x.r))}</b> · ${x.phaseChanged ? `${esc(ph(x.b!.phase))} → ${esc(ph(x.r.phase))}` : esc(ph(x.r.phase))}`, `${(x.d as number) >= 0 ? "+" : ""}${x.d} p.p. de avanço`, "#2fbf71")).join("") : row("Nenhum projeto avançou nos últimos 7 dias.", "", "#e5484d")) +
       (still.length ? `<p style="font-size:12px;color:#5b6b80;margin:6px 0 0">Sem avanço na semana (${still.length}): ${still.slice(0, 12).map(x => esc(name(x.r))).join(", ")}${still.length > 12 ? "…" : ""}</p>` : "") : `<p style="font-size:13px;color:#5b6b80">Ainda não há fotos de 7 dias atrás para comparar; a partir da próxima semana este bloco mostra quem andou.</p>`) +
     sec(`Go-lives previstos nos próximos 30 dias (${soon.length})`, soon.length ? soon.slice(0, 10).map(f => row(`<b>${esc(f.client)}</b> · previsto ${br(f.forecast)}${f.promised ? ` · prometido ${br(f.promised)}` : " · <i>sem data prometida</i>"}`, `${esc(ph(f.phase))} · ${esc(f.owner)} · confiança ${f.confidence}`, f.status === "atrasado" ? "#e5484d" : f.status === "risco" ? "#f2994a" : "#16b8d4")).join("") : row("Nenhuma virada prevista nos próximos 30 dias.", "", "#8a97a8")) +

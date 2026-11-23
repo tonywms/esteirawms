@@ -27,6 +27,16 @@ export default function TvPanel() {
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") setView(v => (v + 1) % N); if (e.key === "f") void document.documentElement.requestFullscreen?.(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
   const s = useMemo(() => flowSummary(data), [data]);
   const u = useMemo(() => unlockSummary(data), [data]);
+  // V28.1 · Documentos anexados nas últimas 48 h (mostra na TV que o anexo entrou)
+  const recent = useMemo(() => {
+    const lim = Date.now() - 48 * 3600e3, out: { id: string; client: string; letter: string; doc: string; at: string; by?: string }[] = [];
+    for (const p of data.projects) {
+      const client = data.clients.find(c => c.id === p.clientId)?.name || p.name;
+      for (const ph of PHASES) { const d = p.phases?.[ph.key]?.doc; if (d?.uploadedAt && new Date(d.uploadedAt).getTime() >= lim) out.push({ id: `${p.id}-${ph.key}`, client, letter: ph.letter, doc: ph.doc.replace("Documento de ", ""), at: d.uploadedAt, by: d.uploadedBy }); }
+      for (const x of p.extraDocs || []) { const t = x.signed?.uploadedAt; if (t && new Date(t).getTime() >= lim) out.push({ id: `${p.id}-${x.id}`, client, letter: "+", doc: x.title, at: t, by: x.manual?.by || x.uploadedBy }); }
+    }
+    return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8);
+  }, [data]);
   const hm = useMemo(() => heatmap(data, "fase"), [data]);
   const gs = useMemo(() => gargalosSummary(data), [data]);
   const atk = useMemo(() => attackFirst(hm.heats, 5), [hm.heats]);
@@ -64,6 +74,7 @@ export default function TvPanel() {
       <div className="v8-cov">{u.coverage.map(c => <div key={c.key} className={c.pct >= 80 ? "good" : c.pct >= 50 ? "mid" : "bad"}>
         <b>{c.letter}</b><div><strong>{c.short}</strong><small>{c.ok}/{c.need} PDFs OK{c.sent ? ` · ${c.sent} na assinatura` : ""}</small></div><em>{c.pct}%</em><i><s style={{ width: `${c.pct}%` }} /></i>
       </div>)}</div>
+      {recent.length > 0 && <div className="v281-recent"><span className="t"><CheckCircle2 size={16} /> Anexados nas últimas 48h</span>{recent.map(r => <span key={r.id} className="it"><b>{r.letter}</b>{r.client} · {r.doc}<small>{new Date(r.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>)}</div>}
       <div className="v8-unlock-grid">
         <div className="panel-tv">
           <h3><Unlock /> Prontos para avançar <em>{u.ready.length}</em></h3>
