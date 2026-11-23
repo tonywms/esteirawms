@@ -10,6 +10,7 @@ import type { PhaseDoc } from "@/lib/types";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import MasterDialog, { type MasterBox } from "./MasterDialog";
 import NextActionDialog, { type NextAction } from "./NextActionDialog";
+import { filesToPdf, uploadProjectPdf } from "@/lib/pdf-compose";
 import EscalateDialog from "./EscalateDialog";
 import ReportDialog from "./ReportDialog";
 import SignDialog, { type SignTarget } from "./SignDialog";
@@ -142,24 +143,16 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   const docs = docStates(p);
   const flash = (text: string, err = false) => { setMsg(err ? friendly(text) : text); setMsgErr(err); if (!err) window.setTimeout(() => setMsg(""), 2600); };
   const pickFile = (k2: PhaseKey) => { setDocPhase(k2); fileRef.current?.click(); };
-  async function uploadDoc(file: File) {
+  // V25: aceita PDF ou fotos do papel assinado (várias fotos viram um PDF só)
+  async function uploadDoc(files: File[]) {
     const phase = docPhase, meta = PHASES.find(x => x.key === phase)!;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return flash("Envie o documento em PDF.", true);
-    if (file.size > 25 * 1048576) return flash("O PDF deve ter no máximo 25 MB.", true);
+    if (!files.length) return;
     setBusy("doc"); setPct(0); setMsg("");
     try {
-      const r = await fetch("/api/docs/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: p.id, phase }) });
-      const t = await r.json(); if (!r.ok) throw new Error(t.error || "Falha ao preparar o envio.");
-      await new Promise<void>((res, rej) => {
-        const x = new XMLHttpRequest(); x.open("POST", t.uploadUrl);
-        x.setRequestHeader("apikey", t.apikey); x.setRequestHeader("Authorization", `Bearer ${t.apikey}`); x.setRequestHeader("Content-Type", "application/pdf"); x.setRequestHeader("x-upsert", "false");
-        x.upload.onprogress = e => { if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100)); };
-        x.onload = () => (x.status < 300 ? res() : rej(new Error(`Falha no envio do PDF (${x.status}). ${x.responseText.slice(0, 120)}`)));
-        x.onerror = () => rej(new Error("Falha de conexão ao enviar o PDF."));
-        x.send(file);
-      });
-      const doc: PhaseDoc = { path: t.path, name: file.name, size: file.size, uploadedAt: new Date().toISOString(), uploadedBy: meName || undefined };
-      const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF anexado · ${meta.doc}: ${file.name}` }, ...(p.timeline || [])];
+      const pdf = await filesToPdf(files, meta.doc);
+      const path = await uploadProjectPdf(p.id, phase, pdf.blob, setPct);
+      const doc: PhaseDoc = { path, name: pdf.name, size: pdf.blob.size, uploadedAt: new Date().toISOString(), uploadedBy: meName || undefined };
+      const tl = [{ id: crypto.randomUUID(), at: new Date().toISOString(), kind: "doc", author: meName || undefined, text: `PDF anexado · ${meta.doc}: ${pdf.name}${pdf.pages ? ` (${pdf.pages} página(s) montadas de ${files.length} arquivo(s))` : ""}` }, ...(p.timeline || [])];
       await patchProject(p.id, { phases: { ...(p.phases || {}), [phase]: { ...(p.phases?.[phase] || {}), doc, docSentAt: null } }, timeline: tl, lastMovement: todayISO() });
       await onRefresh(); flash(`${meta.doc} anexado`);
     } catch (e) { flash(e instanceof Error ? e.message : "Falha ao anexar.", true); }
@@ -303,7 +296,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
               {!doc && !p.phases?.[d.key]?.sign && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className={`v7-mini-btn sent ${d.state === "sent" ? "on" : ""}`} disabled={!!busy} onClick={() => void toggleSent(d.key)} title={d.state === "sent" ? "Desmarcar envio" : "Marcar que o documento foi enviado ao cliente para assinatura"}><Send size={14} /> {d.state === "sent" ? "Enviado" : "Enviado ao cliente"}</button>}
               {doc && <button type="button" className="v7-mini-btn" onClick={() => void viewDoc(d.key, doc)}><Eye size={14} /> Ver</button>}
               {!doc && (d.state === "pending" || d.state === "missing" || d.state === "sent") && <button type="button" className="v7-mini-btn master" disabled={!!busy} onClick={() => openMaster("waive", d.key)} title="Dispensar este PDF (usuário master)" aria-label="Dispensar PDF (master)"><ShieldCheck size={14} /></button>}
-              <button type="button" className={`v7-mini-btn ${doc ? "" : "primary"}`} disabled={!!busy} onClick={() => pickFile(d.key)}><Upload size={14} /> {doc ? "Substituir" : "Anexar PDF"}</button>
+              <button type="button" className={`v7-mini-btn ${doc ? "" : "primary"}`} disabled={!!busy} onClick={() => pickFile(d.key)} title="PDF ou fotos do documento assinado (várias fotos viram um PDF)"><Upload size={14} /> {doc ? "Substituir" : "Anexar PDF ou foto"}</button>
               {doc && <button type="button" className="v7-mini-btn danger" disabled={!!busy} onClick={() => removeDoc(d.key, doc)} aria-label="Remover documento"><X size={14} /></button>}
             </div>
             {(() => { const sg = p.phases?.[d.key]?.sign; if (!sg) return null;
@@ -324,7 +317,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
               </div>; })()}
           </div>; })}
         </section>
-        <ExtraDocs project={p} client={data.clients.find(c => c.id === p.clientId)} onRefresh={onRefresh} flash={flash} onSign={setSignTarget} />
+        <ExtraDocs project={p} tasks={data.tasks} client={data.clients.find(c => c.id === p.clientId)} onRefresh={onRefresh} flash={flash} onSign={setSignTarget} />
         </>}
         {tab === "hist" && <>
         <section className="v7-box">
@@ -365,7 +358,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           </div>
         </section>
         </>}
-          <input ref={fileRef} type="file" accept="application/pdf,.pdf" hidden onChange={e => { const f = e.target.files?.[0]; if (f) void uploadDoc(f); }} />
+          <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*" multiple hidden onChange={e => { const f = Array.from(e.target.files || []); if (f.length) void uploadDoc(f); }} />
       </div>
       <footer className="v7-drawer-foot">
         <span className={`v7-msg${msgErr ? " err" : ""}`}>{msg}</span>

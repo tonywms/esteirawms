@@ -1386,3 +1386,46 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v24-pv-body iframe { flex: 1; border: 0; width: 100%; background: #f3f6fa; }
 .v24-pv-empty { padding: 40px; text-align: center; color: #5b6b80; }
 @media (max-width: 820px) { .v24-pv-body { grid-template-columns: 1fr; grid-template-rows: 140px 1fr; } .v24-pv-body nav { border-right: 0; border-bottom: 1px solid #e6edf3; } }
+
+/* ===== V25 · Documentos já assinados (PDF ou foto) ===== */
+.v25-new-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 760px) { .v25-new-row { grid-template-columns: 1fr; } }
+.v20-new.v25-signed { border-color: #9fdcb5; background: linear-gradient(135deg, #f1fbf4, #f8fdf9); color: #1e7a45; }
+.v20-new.v25-signed:hover { border-color: #2fbf71; background: #eaf8ef; }
+.v20-new.v25-signed b { color: #17653a; }
+.v20-new.v25-signed small { color: #4c7a5f; }
+.v25-manual span { line-height: 1.45; }
+.v25-docs-panel { margin-top: 0; }
+.v25-docs-panel .v20-extra { border: 0; box-shadow: none; padding: 0; }
+.v25-docs-panel .v20-extra h3 { font-size: 16px; }
+
+.v25-up { width: min(620px, 100%); max-height: min(92vh, 900px); display: flex; flex-direction: column; background: #fff; border-radius: 22px; box-shadow: 0 40px 90px -24px rgba(4, 13, 26, .6); overflow: hidden; color: #14213d; }
+.v25-up > header { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 18px 56px 12px 20px; border-bottom: 1px solid #e6edf3; }
+.v25-up > header .ico { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(135deg, #2fbf71, #17844a); color: #fff; }
+.v25-up h2 { margin: 0; font-size: 18px; }
+.v25-up header p { margin: 3px 0 0; font-size: 12.5px; color: #5b6b80; }
+.v25-up .body { overflow: auto; padding: 14px 20px; display: grid; gap: 10px; }
+.v25-up .fld { display: grid; gap: 4px; }
+.v25-up .fld > span { font-size: 12px; font-weight: 700; color: #3b5268; }
+.v25-up .fld input { height: 38px; border: 1px solid #d5e0e8; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 13.5px; }
+.v25-up .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.v25-up .chips button { border: 1px solid #cfe3ea; background: #f2fafc; color: #0e6f82; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.v25-up .drop { display: grid; justify-items: center; gap: 6px; padding: 18px; border: 2px dashed #b9d7e2; border-radius: 16px; background: #f7fbfd; color: #3b5268; text-align: center; }
+.v25-up .drop.on { border-color: #16b8d4; background: #e9f8fb; }
+.v25-up .drop small { color: #7a8799; }
+.v25-up .drop .btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.v25-up .drop .btn { height: 34px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.v25-up .files { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; counter-reset: f; }
+.v25-up .files li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid #e6edf3; border-radius: 10px; counter-increment: f; }
+.v25-up .files li::before { content: counter(f); font-size: 11px; font-weight: 800; color: #7a8799; width: 14px; }
+.v25-up .files .k { color: #0a7f9c; display: grid; }
+.v25-up .files .n { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v25-up .files .n small { margin-left: 8px; color: #7a8799; font-size: 11px; }
+.v25-up .files .ord button, .v25-up .files .rm { border: 0; background: #f1f5f8; color: #3b5268; border-radius: 7px; width: 26px; height: 26px; cursor: pointer; font-size: 10px; display: inline-grid; place-items: center; margin-left: 2px; }
+.v25-up .files .rm:hover { background: #fde8e8; color: #c22b31; }
+.v25-up .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 620px) { .v25-up .grid { grid-template-columns: 1fr; } }
+.v25-up > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid #e6edf3; }
+.v25-up > footer .btn { height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 16px; }
+.v20-extra h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.v20-extra h3 em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: var(--p6-info-bg); color: var(--p6-teal-600); }
