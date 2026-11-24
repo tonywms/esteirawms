@@ -9,11 +9,12 @@ import { fmtDate, todayISO } from "@/lib/metrics";
 import { avatarUrl, registerAvatars } from "@/lib/avatars";
 import { PersonPhoto } from "./PersonPhoto";
 import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
+import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
 const empty: State = { version: 1, importedAt: "", sourceFile: "", clients: [], projects: [], tasks: [], appointments: [], staff: [], users: [], audit: [] };
 const order: Record<Health, number> = { red: 0, amber: 1, green: 2, done: 3 };
-const VIEWS = ["Esteira por fases", "Destravar a onda", "Gargalos, go-lives e agenda", "Mapa de gargalos"];
+const VIEWS = ["Esteira por fases", "Destravar a onda", "Gargalos, go-lives e agenda", "Mapa de gargalos", "Linha do tempo da semana"];
 const N = VIEWS.length;
 
 export default function TvPanel() {
@@ -96,7 +97,8 @@ export default function TvPanel() {
           <p className="v8-legend">K endereçamento · D integração · H homologação · I implantação · G go-live</p>
         </div>
       </div>
-    </section> : view === 3 ? <section className="v17-tv">
+    </section> : view === 4 ? <TvTimeline data={data} />
+    : view === 3 ? <section className="v17-tv">
       <div className="panel-tv v17-tv-heat">
         <h3><AlertTriangle /> Onde a esteira está travando <em>{gs.pctInGoal === null ? "—" : `${gs.pctInGoal}% na meta`}</em></h3>
         <div className="v17-tv-grid" style={{ gridTemplateColumns: `minmax(0,1.3fr) repeat(${DIMS.length}, minmax(0,1fr))` }}>
@@ -142,4 +144,23 @@ export default function TvPanel() {
       <span className="bar" key={view} />
     </footer>
   </div>;
+}
+
+/* V31 · TV: linha do tempo da semana (consultor × dia: cliente, etapa e o que foi feito / onde parou) */
+function TvTimeline({ data }: { data: State }) {
+  const today = todayISO(), from = mondayOf(today), to = addDays(from, 4);
+  const days = daysBetween(from, to);
+  const groups = useMemo(() => buildTimeline(data, from, to, { mode: "consultor", today }), [data, from, to, today]);
+  const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  return <section className="v31-tv">
+    <div className="v31-tv-head" style={{ gridTemplateColumns: `220px repeat(${days.length}, 1fr)` }}><span />{days.map(d => <span key={d} className={d === today ? "today" : ""}><b>{WD[new Date(d + "T12:00:00").getDay()]}</b> {brS(d)}</span>)}</div>
+    <div className="v31-tv-body">{groups.slice(0, 9).map((g, gi) => <div key={g.person} className="v31-tv-row" style={{ gridTemplateColumns: `220px repeat(${days.length}, 1fr)`, animationDelay: `${gi * 90}ms` }}>
+      <span className="who"><PersonPhoto name={g.person} size={42} /><b>{g.person}</b>{g.stops.length > 0 && <em>{g.stops.length} parada(s)</em>}</span>
+      {days.map(d => { const items = g.lanes.flatMap(l => { const e = l.entries.filter(x => x.date === d); const sg = l.segs.find(x => x.kind !== "crono" && x.start <= d && x.end >= d); const ap = l.apps.find(a => a.date === d);
+          return e.length || sg || ap ? [{ l, e, sg, ap }] : []; });
+        return <div key={d} className={`cell ${d === today ? "today" : ""} ${d > today ? "fut" : ""}`}>{items.slice(0, 2).map(({ l, e, sg, ap }) => <div key={l.key} className={`it ${e.some(x => x.status === "parado") ? "stop" : e.some(x => x.status === "parcial") ? "part" : ""}`} style={{ borderColor: PHASE_COLOR[sg?.phase || "none"] }}>
+          <b>{l.client}</b><small>{e[0] ? e[0].text : sg ? sg.label : ap?.title}</small>{e.find(x => x.status !== "ok")?.reason && <em>⛔ {e.find(x => x.status !== "ok")?.reason}</em>}</div>)}
+          {items.length > 2 && <i>+{items.length - 2}</i>}</div>; })}
+    </div>)}{!groups.length && <div className="v31-tv-empty">Nenhuma agenda, etapa ou registro nesta semana.</div>}</div>
+  </section>;
 }

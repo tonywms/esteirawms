@@ -9,6 +9,7 @@ import type { ScheduleTeam } from "@/lib/types";
 import { phaseOwner } from "@/lib/flow";
 import { todayISO } from "@/lib/metrics";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
+import { ChartGantt as GanttV31 } from "lucide-react";
 
 type Props = { project: Project; data: State; onRefresh: () => Promise<void> | void; notify: (m: string) => void; canWrite?: boolean };
 const rid = () => crypto.randomUUID();
@@ -54,6 +55,7 @@ export default function Cronograma({ project: p, data, onRefresh, notify, canWri
       <button type="button" className="tg" onClick={() => setOpen(o => !o)} aria-expanded={open}><h3><CalendarRange size={17} /> Cronograma de implantação</h3>
         <small>{st.dated} de {st.total} atividades com data{st.late.length ? ` · ${st.late.length} atrasada(s)` : ""}{st.next ? ` · próxima: ${st.next.activity} (${brDate(st.next.start || st.next.end)})` : ""}{p.schedule?.updatedAt ? ` · salvo ${new Date(p.schedule.updatedAt).toLocaleDateString("pt-BR")}${p.schedule.updatedBy ? ` por ${p.schedule.updatedBy}` : ""}` : ""}</small></button>
       <div className="acts">
+        <a className="btn outline small v31-link" href={`/linha-do-tempo?projeto=${p.id}`} title="Ver a linha do tempo deste projeto (quem entrou em cada fase, diário e paradas)"><GanttV31 size={14} /> Linha do tempo</a>
         <button type="button" className="btn outline small" disabled={dirty} title={dirty ? "Salve antes de gerar" : "Abrir o PDF"} onClick={() => dl("pdf", true)}><Eye size={14} /> Ver PDF</button>
         <button type="button" className="btn outline small" disabled={dirty} title={dirty ? "Salve antes de gerar" : "Baixar PDF para enviar ao cliente"} onClick={() => dl("pdf")}><FileText size={14} /> PDF</button>
         <button type="button" className="btn outline small" disabled={dirty} title={dirty ? "Salve antes de gerar" : "Baixar Excel para enviar ao cliente"} onClick={() => dl("xlsx")}><FileSpreadsheet size={14} /> Excel</button>
