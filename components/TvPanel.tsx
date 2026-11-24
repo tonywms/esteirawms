@@ -3,7 +3,8 @@
 // Esteira por fases · Destravar a onda (PDFs) · Gargalos, go-lives e agenda · Mapa de gargalos (V17).
 // V32 · Logo do cliente ao lado do nome.
 // V36 · Recarrega sozinha quando sai uma versão nova do site.
-import { useCallback, useEffect, useMemo, useState } from "react";
+// V37 · Cabe sempre numa tela: a visão encolhe até caber e as listas mostram só o que cabe inteiro, com "+N mais".
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, FileX2, Hand, LockKeyhole, Maximize2, Rocket, Timer, TrendingUp, Unlock, Users } from "lucide-react";
 import type { State } from "@/lib/types";
 import { PHASES, ballOf, docStates, flowSummary, phaseIndex, phaseOwner, unlockSummary, type Health } from "@/lib/flow";
@@ -25,11 +26,16 @@ const N = VIEWS.length;
 export default function TvPanel() {
   const [data, setData] = useState<State>(empty), [updated, setUpdated] = useState<Date | null>(null), [err, setErr] = useState("");
   const [view, setView] = useState(0), [now, setNow] = useState(() => new Date());
+  const stage = useRef<HTMLDivElement>(null), [vp, setVp] = useState("");
+  const [tlMs, setTlMs] = useState(ROTATE_MS); // V37: a linha do tempo fica o tempo de mostrar todas as páginas
+  useEffect(() => { const t = setTimeout(() => setView(v => (v + 1) % N), view === 4 ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS); return () => clearTimeout(t); }, [view, tlMs]);
+  useEffect(() => { const r = () => setVp(`${window.innerWidth}x${window.innerHeight}`); r(); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
+  useLayoutEffect(() => { const el = stage.current; if (!el) return; fitTv(el); const t = setTimeout(() => fitTv(el), 700), t2 = setTimeout(() => fitTv(el), 2500); return () => { clearTimeout(t); clearTimeout(t2); }; }, [data, view, vp]);
   const load = useCallback(async () => {
     try { const r = await fetch("/api/state", { cache: "no-store" }); if (!r.ok) throw new Error(r.status === 401 ? "Link da TV expirado: abra novamente o link com a chave." : "Falha ao carregar"); const j = await r.json(); registerAvatars(j.avatars); registerLogos(j.logos, j.clients); setData(j); setUpdated(new Date()); setErr(""); }
     catch (e) { setErr(e instanceof Error ? e.message : "Sem conexão"); }
   }, []);
-  useEffect(() => { void load(); const a = setInterval(() => void load(), REFRESH_MS), b = setInterval(() => setView(v => (v + 1) % N), ROTATE_MS), c = setInterval(() => setNow(new Date()), 1000); return () => { clearInterval(a); clearInterval(b); clearInterval(c); }; }, [load]);
+  useEffect(() => { void load(); const a = setInterval(() => void load(), REFRESH_MS), c = setInterval(() => setNow(new Date()), 1000); return () => { clearInterval(a); clearInterval(c); }; }, [load]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") setView(v => (v + 1) % N); if (e.key === "f") void document.documentElement.requestFullscreen?.(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
   const s = useMemo(() => flowSummary(data), [data]);
   const u = useMemo(() => unlockSummary(data), [data]);
@@ -69,6 +75,7 @@ export default function TvPanel() {
       <div className="k ball"><Hand /><div>{s.ball.map(b => <b key={b.name}><i>{b.count}</i>{b.name}</b>)}</div><span>Bola com · {active} ativos</span></div>
     </section>
 
+    <div className="v37-stage" ref={stage}>
     {view === 0 ? <section className="v7-tv-flow" style={{ gridTemplateColumns: `repeat(${PHASES.length - 1}, minmax(0,1fr))` }}>
       {s.byPhase.filter(ph => ph.key !== "fim").map((ph, i) => <div key={ph.key} className="col">
         <header><span>{i + 1}</span><strong>{ph.short}</strong><em>{ph.items.length}</em></header>
@@ -103,7 +110,7 @@ export default function TvPanel() {
           <p className="v8-legend">K endereçamento · D integração · H homologação · I implantação · G go-live</p>
         </div>
       </div>
-    </section> : view === 4 ? <TvTimeline data={data} />
+    </section> : view === 4 ? <TvTimeline data={data} onDuration={setTlMs} />
     : view === 3 ? <section className="v17-tv">
       <div className="panel-tv v17-tv-heat">
         <h3><AlertTriangle /> Onde a esteira está travando <em>{gs.pctInGoal === null ? "—" : `${gs.pctInGoal}% na meta`}</em></h3>
@@ -144,23 +151,43 @@ export default function TvPanel() {
         </div>
       </div>
     </section>}
+    </div>
 
     <footer className="v7-tv-foot">
       <span className={`live ${err ? "off" : ""}`} />{err || `Atualizado ${updated ? updated.toLocaleTimeString("pt-BR") : "—"} · atualização automática a cada 30s · troca de visão a cada 20s`}
-      <span className="bar" key={view} />
+      <span className="bar" key={view} style={{ animationDuration: `${(view === 4 ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS) / 1000}s` }} />
     </footer>
   </div>;
 }
 
 /* V31 · TV: linha do tempo da semana (consultor × dia: cliente, etapa e o que foi feito / onde parou) */
-function TvTimeline({ data }: { data: State }) {
+function TvTimeline({ data, onDuration }: { data: State; onDuration?: (ms: number) => void }) {
   const today = todayISO(), from = mondayOf(today), to = addDays(from, 4);
   const days = daysBetween(from, to);
   const groups = useMemo(() => buildTimeline(data, from, to, { mode: "consultor", today }), [data, from, to, today]);
   const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  return <section className="v31-tv">
-    <div className="v31-tv-head" style={{ gridTemplateColumns: `220px repeat(${days.length}, 1fr)` }}><span />{days.map(d => <span key={d} className={d === today ? "today" : ""}><b>{WD[new Date(d + "T12:00:00").getDay()]}</b> {brS(d)}</span>)}</div>
-    <div className="v31-tv-body">{groups.slice(0, 9).map((g, gi) => <div key={g.person} className="v31-tv-row" style={{ gridTemplateColumns: `220px repeat(${days.length}, 1fr)`, animationDelay: `${gi * 90}ms` }}>
+  // V37 · paginação: mostra os consultores que cabem inteiros na tela e alterna as páginas
+  const sec = useRef<HTMLElement>(null), body = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
+  const [pages, setPages] = useState<number[][] | null>(null), [pg, setPg] = useState(0), [vp, setVp] = useState("");
+  useEffect(() => { const r = () => setVp(`${window.innerWidth}x${window.innerHeight}`); r(); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
+  const sig = useMemo(() => groups.map(g => `${g.person}:${g.lanes.length}:${g.days}:${g.stops.length}:${g.lanes.reduce((a, l) => a + l.entries.length + l.segs.length + l.apps.length, 0)}`).join("|"), [groups]);
+  useLayoutEffect(() => { setPages(null); }, [sig, vp]);
+  useLayoutEffect(() => {
+    if (pages !== null || !sec.current || !body.current || !head.current) return;
+    if (window.innerWidth < 1100 || window.innerHeight < 420) return;
+    const avail = sec.current.clientHeight - head.current.offsetHeight - 10 - 30;
+    const rows = [...body.current.children].filter(e => e.classList.contains("v31-tv-row")) as HTMLElement[];
+    const out: number[][] = []; let cur: number[] = [], h = 0;
+    rows.forEach((r, i) => { const rh = r.offsetHeight + 10; if (cur.length && h + rh > avail) { out.push(cur); cur = []; h = 0; } cur.push(i); h += rh; });
+    if (cur.length) out.push(cur);
+    setPages(out); setPg(x => (x < out.length ? x : 0));
+  }, [pages]);
+  const PAGE_MS = 8000;
+  useEffect(() => { onDuration?.(pages && pages.length > 1 ? pages.length * PAGE_MS : ROTATE_MS); if (!pages || pages.length < 2) return; const t = setInterval(() => setPg(x => (x + 1) % pages.length), PAGE_MS); return () => clearInterval(t); }, [pages, onDuration]);
+  const shown = (i: number) => !pages || !pages.length || (pages[pg] || pages[0]).includes(i);
+  return <section className="v31-tv" ref={sec} data-nofit="1">
+    <div className="v31-tv-head" ref={head} style={{ gridTemplateColumns: `220px repeat(${days.length}, 1fr)` }}><span />{days.map(d => <span key={d} className={d === today ? "today" : ""}><b>{WD[new Date(d + "T12:00:00").getDay()]}</b> {brS(d)}</span>)}</div>
+    <div className="v31-tv-body" ref={body}>{groups.map((g, gi) => <div key={g.person} className="v31-tv-row" style={{ gridTemplateColumns: `220px repeat(${days.length}, 1fr)`, animationDelay: `${(gi % 8) * 90}ms`, ...(shown(gi) ? {} : { display: "none" }) }}>
       <span className="who"><PersonPhoto name={g.person} size={42} /><b>{g.person}</b>{g.stops.length > 0 && <em>{g.stops.length} parada(s)</em>}</span>
       {days.map(d => { const items = g.lanes.flatMap(l => { const e = l.entries.filter(x => x.date === d); const sg = l.segs.find(x => x.kind !== "crono" && x.start <= d && x.end >= d); const ap = l.apps.find(a => a.date === d);
           return e.length || sg || ap ? [{ l, e, sg, ap }] : []; });
@@ -168,5 +195,45 @@ function TvTimeline({ data }: { data: State }) {
           <b className="v32-nm"><ClientLogo clientId={data.projects.find(x => x.id === l.projectId)?.clientId} size={20} />{l.client}</b><small>{e[0] ? e[0].text : sg ? sg.label : ap?.title}</small>{e.find(x => x.status !== "ok")?.reason && <em>⛔ {e.find(x => x.status !== "ok")?.reason}</em>}</div>)}
           {items.length > 2 && <i>+{items.length - 2}</i>}</div>; })}
     </div>)}{!groups.length && <div className="v31-tv-empty">Nenhuma agenda, etapa ou registro nesta semana.</div>}</div>
+    {pages && pages.length > 1 && <div className="v37-pages">{pages.map((_, i) => <i key={i} className={i === pg ? "on" : ""} />)}<span>Consultores {pages.slice(0, pg).reduce((a, x) => a + x.length, 0) + 1}–{pages.slice(0, pg + 1).reduce((a, x) => a + x.length, 0)} de {groups.length}</span></div>}
   </section>;
+}
+
+/* V37 · Ajuste à tela da TV (qualquer resolução): encolhe a visão até caber e corta as listas no último item inteiro. */
+function fitTv(stage: HTMLElement) {
+  const sec = stage.firstElementChild as HTMLElement | null; if (!sec) return;
+  sec.style.transform = ""; sec.style.width = ""; sec.style.height = "";
+  stage.querySelectorAll<HTMLElement>("[data-v37-hide]").forEach(e => { e.style.display = ""; e.removeAttribute("data-v37-hide"); });
+  stage.querySelectorAll<HTMLElement>("[data-more]").forEach(e => { e.removeAttribute("data-more"); e.style.removeProperty("--v37-h"); e.style.height = ""; });
+  if (window.innerWidth < 1100 || window.innerHeight < 420) return; // celular / tela estreita: rola a página
+  const have = stage.clientHeight, need = sec.scrollHeight;
+  if (have > 0 && need > have + 2 && !sec.dataset.nofit) {
+    const k = Math.max(0.8, have / need);
+    sec.style.transformOrigin = "top left"; sec.style.transform = `scale(${k})`; sec.style.width = `${100 / k}%`; sec.style.height = `${have / k}px`;
+  }
+  stage.querySelectorAll<HTMLElement>(".v17-tv-grid").forEach(g => { // tabela do mapa de gargalos: encolhe dentro do quadro
+    g.style.transform = ""; g.style.width = "";
+    const box = g.parentElement as HTMLElement; if (!box) return;
+    const avail = box.clientHeight - g.offsetTop - 12, need2 = g.scrollHeight;
+    if (avail > 60 && need2 > avail + 2) { const k = Math.max(0.55, avail / need2); g.style.transformOrigin = "top left"; g.style.transform = `scale(${k})`; g.style.width = `${100 / k}%`; }
+  });
+  stage.querySelectorAll<HTMLElement>(".rows, .list").forEach(list => {
+    const box = list.parentElement as HTMLElement | null;
+    let H = list.clientHeight;
+    if (box && list.offsetParent === box) {
+      let after = 0; for (let n = list.nextElementSibling as HTMLElement | null; n; n = n.nextElementSibling as HTMLElement | null) after += n.offsetHeight;
+      const pb = parseFloat(getComputedStyle(box).paddingBottom) || 0;
+      H = Math.min(H, box.clientHeight - pb - after - list.offsetTop);
+    }
+    if (H <= 0 || list.scrollHeight <= H + 1) return;
+    const kids = [...list.children] as HTMLElement[], more = kids.find(k => k.classList.contains("more"));
+    let extra = more ? Number((more.textContent || "").match(/\+(\d+)/)?.[1] || 0) : 0;
+    if (more) { more.style.display = "none"; more.setAttribute("data-v37-hide", "1"); }
+    let cut = false;
+    for (const it of kids) {
+      if (it === more || it.classList.contains("ok") || it.classList.contains("muted")) continue;
+      if (cut || it.offsetTop + it.offsetHeight > H - 30) { cut = true; it.style.display = "none"; it.setAttribute("data-v37-hide", "1"); extra++; }
+    }
+    if (extra > 0) { list.style.height = `${H}px`; list.setAttribute("data-more", `+${extra} mais`); list.style.setProperty("--v37-h", `${H}px`); }
+  });
 }
