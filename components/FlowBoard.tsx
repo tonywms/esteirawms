@@ -26,6 +26,7 @@ import { avatarUrl } from "@/lib/avatars";
 import { PersonPhoto } from "./PersonPhoto";
 import Select from "./Select";
 import { ClientLogo } from "./ClientLogo"; // V32
+import { inFlow, isSimpleFlow } from "@/lib/flow"; // V34
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onEdit: (p: Project) => void; onOpen: (p: Project) => void };
 const clientName = (s: State, id: string) => s.clients.find(c => c.id === id)?.name || "Cliente";
@@ -116,7 +117,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
     {PHASES.map(ph => <div key={ph.key} className={`v7-cell ${ph.key === "fim" ? "done" : ""}`}>
       {rows.filter(r => r.phase === ph.key).sort((a, b) => ({ red: 0, amber: 1, green: 2, done: 3 }[a.h.health] - { red: 0, amber: 1, green: 2, done: 3 }[b.h.health])).map(({ p, h }) =>
         <button key={p.id} className={`v7-card v7-${h.health}`} onClick={() => onPick(p.id)} title={h.reasons.join(" · ")}>
-          <div className="v7-card-top"><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={20} />{clientName(data, p.clientId)}</strong><Dot h={h.health} /></div>
+          {isSimpleFlow(p) && <span className="v34-flowchip" title="Fluxo simplificado: só homologação e go-live">Customização</span>}<div className="v7-card-top"><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={20} />{clientName(data, p.clientId)}</strong><Dot h={h.health} /></div>
           <div className="v7-card-owner">{avatarUrl(phaseOwner(p)) ? <PersonPhoto name={phaseOwner(p)} size={22} className="v7-av-photo" /> : <span className="v7-av">{initials(phaseOwner(p))}</span>}{phaseOwner(p)}</div>
           <div className="v7-card-meta">
             <span title="Dias na fase"><Timer size={12} />{h.inPhase ?? "–"}d</span>
@@ -259,7 +260,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           const info = p.phases?.[ph.key];
           const state = i < idx ? "past" : i === idx ? "now" : "next";
           const ds = docs.find(d => d.key === ph.key);
-          return <li key={ph.key} className={`${state}${ph.optional ? " optional" : ""}`}><span className="v7-step-dot">{i < idx ? <CheckCircle2 size={14} /> : i + 1}</span>{ds && <em className={`v7-step-doc s-${ds.state}`} title={`${ds.doc}: ${DOC_STATE_LABEL[ds.state]}`}><DocIcon s={ds.state} size={11} /></em>}<div><strong>{ph.short}</strong>{ph.optional && <small className="v7-opt">opcional</small>}<small>{i <= idx ? phaseOwner(p, ph.key) : ph.defaultOwner || "—"}</small>{info?.start && <small>{fmtDate(info.start)}{info.done ? ` → ${fmtDate(info.done)}` : ""}</small>}</div></li>;
+          return <li key={ph.key} className={`${state}${ph.optional || !inFlow(p, ph.key) ? " optional" : ""}`} title={!inFlow(p, ph.key) ? "Fora do fluxo simplificado" : undefined}><span className="v7-step-dot">{i < idx ? <CheckCircle2 size={14} /> : i + 1}</span>{ds && <em className={`v7-step-doc s-${ds.state}`} title={`${ds.doc}: ${DOC_STATE_LABEL[ds.state]}`}><DocIcon s={ds.state} size={11} /></em>}<div><strong>{ph.short}</strong>{ph.optional && <small className="v7-opt">opcional</small>}<small>{i <= idx ? phaseOwner(p, ph.key) : ph.defaultOwner || "—"}</small>{info?.start && <small>{fmtDate(info.start)}{info.done ? ` → ${fmtDate(info.done)}` : ""}</small>}</div></li>;
         })}</ol>
 
         {h.reasons.length > 0 && h.health !== "done" && <div className={`v7-reasons v7-${h.health}`}>{h.reasons.map(r => <div key={r}><AlertTriangle size={14} />{r}</div>)}</div>}

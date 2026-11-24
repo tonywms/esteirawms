@@ -7,7 +7,7 @@ const NAVY = "#0B1A2C", ALT = "#F4F7FA", PINK = "#FDECEC", RED = "#C0392B", TEXT
 
 export function buildScheduleXlsx(project: Project, client: Client | undefined, opts: { consultant?: string } = {}) {
   const name = clientDisplayName(client), info = client?.info || {};
-  const sched = scheduleOf(project.schedule);
+  const sched = scheduleOf(project.schedule, project.flow);
   const rows: (Cell | null)[][] = [], merges: string[] = [], heights: Record<number, number> = {};
   const N = 12; // A..L
   const put = (cells: (Cell | null)[]) => { rows.push(cells); return rows.length; };

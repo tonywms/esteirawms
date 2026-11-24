@@ -76,7 +76,7 @@ function logoBlock(cx: number, cy: number) {
 export function buildEscopoDocx(project: Project, client: Client | undefined, opts: { consultant?: string; logo?: Uint8Array | null } = {}) {
   const files = unzip(Buffer.from(ESCOPO_DOCX, "base64"));
   const name = clientDisplayName(client), info = client?.info || {};
-  const sched = scheduleOf(project.schedule), team = sched.team || {};
+  const sched = scheduleOf(project.schedule, project.flow), team = sched.team || {};
   const consultant = team.gestor || opts.consultant || "";
   const today = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const swapName = (xml: string) => xml

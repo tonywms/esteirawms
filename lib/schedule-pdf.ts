@@ -85,7 +85,7 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
   }
 
   /* ---------- Cronograma ---------- */
-  const sched = scheduleOf(project.schedule);
+  const sched = scheduleOf(project.schedule, project.flow);
   const namesOf = (r: ScheduleRow) => clientNames(r, client?.info);
   const expOf = (r: ScheduleRow) => expertNames(r, sched.team, opts.consultant).join(", ");
   const heightOf = (r: ScheduleRow) => (namesOf(r).length || expOf(r) ? 21 : 15.6);

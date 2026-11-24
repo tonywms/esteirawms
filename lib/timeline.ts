@@ -71,7 +71,7 @@ export function projectTimeline(s: State, p: Project, today: string) {
   }
   flush();
   // 3) cronograma do projeto (time Expert e time cliente)
-  const sched = scheduleOf(p.schedule);
+  const sched = scheduleOf(p.schedule, p.flow);
   if (p.schedule?.rows?.length) for (const r of sched.rows) {
     const start = r.start || r.end, end = r.end || r.start; if (!start || !end) continue;
     const k = phaseFromText(`${r.phase} ${r.activity}`);

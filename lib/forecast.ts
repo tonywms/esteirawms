@@ -1,7 +1,7 @@
 // V27 · Previsão de go-live: quando cada projeto deve virar, a partir da fase atual, das metas por fase
 // e do ritmo real do dono da fase (quanto ele costuma levar em relação à meta).
 import type { Project, State } from "./types";
-import { PHASES, isArchived, phaseIndex, phaseOf, phaseOwner, phaseSince, healthOf, type PhaseKey } from "./flow";
+import { PHASES, inFlow, isArchived, phaseIndex, phaseOf, phaseOwner, phaseSince, healthOf, type PhaseKey } from "./flow";
 import { PHASE_GOALS, businessDays } from "./gargalos";
 import { todayISO } from "./metrics";
 
@@ -62,6 +62,7 @@ export function forecastAll(s: State, today = todayISO()): Map<string, Forecast>
     const steps: Forecast["steps"] = [{ phase: k, days: curLeft + (blocked ? 2 : 0), current: true }];
     for (const ph of PHASES.slice(phaseIndex(k) + 1)) {
       if (ph.key === "golive" || ph.key === "fim") break;
+      if (!inFlow(p, ph.key)) continue; // V34: fluxo simplificado
       const g = PHASE_GOALS[ph.key]?.goal; if (!g) continue;
       steps.push({ phase: ph.key, days: Math.max(1, Math.round(g * pr.ratio)) });
     }

@@ -11,6 +11,7 @@ import type { EntityName, State } from "./types";
 */
 import { sbLoad, sbReplace, sbSaveDiff, supabaseConfigured } from "./supabase-store";
 import { canMove, phaseOf, type PhaseKey } from "./flow";
+import { applyAutoProgress } from "./progress"; // V34: avanço automático
 const dbFile=path.join(process.cwd(),"data","state.json");
 export const storageMode=():"supabase"|"file"=>supabaseConfigured()?"supabase":"file";
 const assertWritableHost=()=>{if(process.env.VERCEL==="1"&&storageMode()==="file")throw new Error("Armazenamento nao configurado: defina SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY e ESTEIRA_DB_CHAVE no Vercel.")};
@@ -18,7 +19,7 @@ export const emptyState=():State=>({version:1,importedAt:"",sourceFile:"",client
 let queue=Promise.resolve();
 export const validEntities:EntityName[]=["clients","projects","tasks","appointments","staff","users"];
 export const isEntity=(name:string):name is EntityName=>validEntities.includes(name as EntityName);
-const normalize=(raw:State)=>{for(const k of validEntities)if(!Array.isArray(raw[k]))(raw as unknown as Record<string,unknown[]>)[k]=[];if(!Array.isArray(raw.audit))raw.audit=[];return raw};
+const normalize=(raw:State)=>{for(const k of validEntities)if(!Array.isArray(raw[k]))(raw as unknown as Record<string,unknown[]>)[k]=[];if(!Array.isArray(raw.audit))raw.audit=[];return applyAutoProgress(raw)};
 
 export async function loadState():Promise<State>{
  assertWritableHost();
@@ -31,11 +32,13 @@ export async function transact<T>(fn:(state:State)=>T|Promise<T>):Promise<T>{
    const state=await loadState();
    const before=structuredClone(state);
    const out=await fn(state);
+   applyAutoProgress(state);
    await sbSaveDiff(before,state);
    return out;
   }
   const state=await loadState();
   const out=await fn(state);
+  applyAutoProgress(state);
   const tmp=path.join(path.dirname(dbFile),`.state-${randomUUID()}.tmp`);
   await fs.writeFile(tmp,JSON.stringify(state,null,2),"utf8");
   try{await fs.rename(tmp,dbFile)}catch(e){await fs.rm(tmp,{force:true}).catch(()=>{});throw e}
@@ -71,7 +74,7 @@ export function validate(entity:EntityName, value:Record<string,unknown>,s:State
   // V9: dispensa de PDF só pela rota de liberação master (e-mail + senha)
   const waivers=(ph:unknown)=>JSON.stringify(Object.entries((ph||{}) as Record<string,{docWaived?:unknown}>).map(([k,v])=>[k,v?.docWaived||null]).filter(x=>x[1]).sort());
   if(value.phases!==undefined&&waivers(value.phases)!==waivers(old?.phases))return "Somente um usuário master pode liberar fase sem PDF.";
-  if(old&&value.phase&&value.phase!==phaseOf(old)){const r=canMove({...old,phases:(value.phases as typeof old.phases)||old.phases},value.phase as PhaseKey);if(!r.ok)return r.reason||"Avanço de fase bloqueado.";}
+  if(old&&value.phase&&value.phase!==phaseOf(old)){const r=canMove({...old,flow:(value.flow as typeof old.flow)??old.flow,phases:(value.phases as typeof old.phases)||old.phases},value.phase as PhaseKey);if(!r.ok)return r.reason||"Avanço de fase bloqueado.";}
  }
  if(entity==="tasks"){
   if(!required(value.title))return "Informe a descrição da atividade.";

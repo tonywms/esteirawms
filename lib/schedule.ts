@@ -50,10 +50,20 @@ const TEMPLATE: T[] = [
   ["golive", "Acompanhamento", "Dúvidas e alinhamentos", "Consultor Expert", "", "Time cliente (1p)", "", false, true],
 ];
 const rid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2));
-export function templateRows(): ScheduleRow[] {
-  return TEMPLATE.map(([group, phase, activity, expert, expertHrs, client, clientHrs, highlight, continuous]) => ({ id: rid(), group, phase, activity, expert, expertHrs, client, clientHrs, start: null, end: null, highlight: !!highlight, continuous: !!continuous, clientPeople: [], expertPerson: "" }));
+/** V34 · Modelo do fluxo simplificado (customização): homologação e go-live. */
+const TEMPLATE_SIMPLE: T[] = [
+  ["integracao", "Homologação", "Entrega da customização para homologação", "Consultor Expert", "", "Key users (2)", ""],
+  ["integracao", "Homologação", "Testes e homologação da customização", "Consultor Expert", "", "Key users (2)", "", true],
+  ["integracao", "Homologação", "Ajustes apontados na homologação", "Desenvolvedor", "", "-", ""],
+  ["integracao", "Homologação", "Termo de homologação assinado", "Consultor Expert", "", "Patrocinador", "", true],
+  ["golive", "Go-live", "Publicação em produção (go-live)", "Consultor Expert", "", "TI Cliente", ""],
+  ["golive", "Go-live", "Acompanhamento pós go-live", "Consultor Expert", "", "Key users (2)", "", false, true],
+  ["golive", "Go-live", "Termo de go-live / encerramento", "Consultor Expert", "", "Patrocinador", "", true],
+];
+export function templateRows(flow?: string | null): ScheduleRow[] {
+  return (flow === "simples" ? TEMPLATE_SIMPLE : TEMPLATE).map(([group, phase, activity, expert, expertHrs, client, clientHrs, highlight, continuous]) => ({ id: rid(), group, phase, activity, expert, expertHrs, client, clientHrs, start: null, end: null, highlight: !!highlight, continuous: !!continuous, clientPeople: [], expertPerson: "" }));
 }
-export const scheduleOf = (s?: ProjectSchedule | null): ProjectSchedule => (s && Array.isArray(s.rows) && s.rows.length ? s : { rows: templateRows() });
+export const scheduleOf = (s?: ProjectSchedule | null, flow?: string | null): ProjectSchedule => (s && Array.isArray(s.rows) && s.rows.length ? s : { rows: templateRows(flow) });
 
 /** Pessoas do cliente que podem ser responsáveis (patrocinador, key users, TI). */
 export function clientPeople(info?: ClientInfo | null): { key: string; label: string; person: ClientPerson }[] {

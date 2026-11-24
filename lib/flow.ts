@@ -37,6 +37,12 @@ export function phaseOf(p: Project): PhaseKey {
   if (stage.includes("campo") || stage.includes("implanta") || stage.includes("validacao") || st.includes("implanta")) return "campo";
   return "dev";
 }
+/* V34 · Fluxo do projeto: completo (todas as fases) ou simplificado (customização: homologação e go-live). */
+export const SIMPLE_PHASES: PhaseKey[] = ["homolog", "golive", "fim"];
+export const isSimpleFlow = (p: Pick<Project, "flow">) => p.flow === "simples";
+/** Fases que fazem parte do fluxo deste projeto. */
+export const flowPhases = (p: Pick<Project, "flow">) => (isSimpleFlow(p) ? PHASES.filter(x => SIMPLE_PHASES.includes(x.key)) : [...PHASES]);
+export const inFlow = (p: Pick<Project, "flow">, k: string) => !isSimpleFlow(p) || SIMPLE_PHASES.includes(k as PhaseKey);
 export const phaseIndex = (k: string) => Math.max(0, PHASES.findIndex(p => p.key === k));
 export const phaseLabel = (k: string) => PHASES.find(p => p.key === k)?.label || k;
 
@@ -172,6 +178,7 @@ export function docStates(p: Project): { key: PhaseKey; letter: string; doc: str
     const i = phaseIndex(ph.key);
     let state: DocState = docOf(p, ph.key) ? "ok" : i < ci ? "missing" : i === ci ? "pending" : "future";
     if (ph.key === "campo" && state === "missing" && campoSkipped(p, cur)) state = "skipped";
+    if (!inFlow(p, ph.key) && state !== "ok") state = "skipped"; // V34: fase fora do fluxo simplificado
     if ((state === "pending" || state === "missing") && p.phases?.[ph.key]?.docSentAt) state = "sent";
     if (state !== "ok" && state !== "future" && state !== "skipped" && waiverOf(p, ph.key)) state = "waived";
     return { key: ph.key, letter: ph.letter, doc: ph.doc, label: ph.short, state };
@@ -182,6 +189,8 @@ export function canMove(p: Project, to: PhaseKey): { ok: boolean; reason?: strin
   const from = phaseOf(p), fi = phaseIndex(from), ti = phaseIndex(to);
   if (ti <= fi) return { ok: true };
   const skipsOnlyCampo = from === "homolog" && to === "golive";
+  // V34: fluxo simplificado entra direto na Homologação, sem os PDFs de kickoff e integração
+  if (isSimpleFlow(p) && !inFlow(p, from)) return to === "homolog" || ti <= phaseIndex("homolog") ? { ok: true } : { ok: false, reason: "Fluxo simplificado: comece pela Homologação." };
   if (ti - fi > 1 && !skipsOnlyCampo) return { ok: false, reason: "Avance uma fase por vez." };
   const ph = PHASES[fi];
   if (ph.doc && !docResolved(p, from)) return { ok: false, reason: `Anexe o ${ph.doc.toLowerCase()} (PDF assinado) para sair de ${ph.short}.` };

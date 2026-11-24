@@ -33,7 +33,7 @@ export function snapshotRows(s: State, today = todayISO()): Snap[] {
     const sev = Object.values(h.dims).reduce((a, d) => a + d.sev, 0);
     return {
       day: today, project_id: p.id, client_id: p.clientId, phase: h.phase,
-      progress: progressOf(h.phase, ts.filter(done).length, ts.length, p.progress),
+      progress: p.progress, // V34: avanço automático do projeto (cronograma / fase)
       health: healthScore(sev, h.health === "red"), owner: h.owner || "Não definido", wave: h.wave, ball: h.ball,
     };
   });

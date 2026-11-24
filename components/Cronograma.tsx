@@ -10,12 +10,13 @@ import { phaseOwner } from "@/lib/flow";
 import { todayISO } from "@/lib/metrics";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
 import { ChartGantt as GanttV31 } from "lucide-react";
+import { progressInfo } from "@/lib/progress"; // V34
 
 type Props = { project: Project; data: State; onRefresh: () => Promise<void> | void; notify: (m: string) => void; canWrite?: boolean };
 const rid = () => crypto.randomUUID();
 
 export default function Cronograma({ project: p, data, onRefresh, notify, canWrite = true }: Props) {
-  const saved = useMemo(() => scheduleOf(p.schedule), [p.schedule]);
+  const saved = useMemo(() => scheduleOf(p.schedule, p.flow), [p.schedule, p.flow]);
   const isNew = !p.schedule?.rows?.length;
   const [team, setTeam] = useState<ScheduleTeam>(saved.team || {});
   const [rows, setRows] = useState<ScheduleRow[]>(saved.rows), [consultant, setConsultant] = useState(saved.consultant || p.implementationOwner || phaseOwner(p));
@@ -47,13 +48,13 @@ export default function Cronograma({ project: p, data, onRefresh, notify, canWri
       setDirty(false); await onRefresh(); notify("Cronograma salvo");
     } catch (e) { notify(`Falha: ${e instanceof Error ? e.message : "não foi possível salvar"}`); } finally { setBusy(false); }
   }
-  const reset = () => setConfirmBox({ title: "Voltar ao modelo padrão?", message: "As atividades voltam a ser as do escopo padrão, sem datas e sem responsáveis. Só vale depois de salvar.", confirmLabel: "Restaurar modelo", tone: "info", onConfirm: () => { setRows(templateRows()); setDirty(true); } });
+  const reset = () => setConfirmBox({ title: "Voltar ao modelo padrão?", message: "As atividades voltam a ser as do escopo padrão, sem datas e sem responsáveis. Só vale depois de salvar.", confirmLabel: "Restaurar modelo", tone: "info", onConfirm: () => { setRows(templateRows(p.flow)); setDirty(true); } });
   const dl = (fmt: "pdf" | "xlsx", ver = false) => { const u = `/api/cronograma/${p.id}?formato=${fmt}${ver ? "&ver=1" : ""}`; if (ver) window.open(u, "_blank"); else window.location.href = u; };
 
   return <div className="panel v29-crono">
     <header className="v29-ch">
-      <button type="button" className="tg" onClick={() => setOpen(o => !o)} aria-expanded={open}><h3><CalendarRange size={17} /> Cronograma de implantação</h3>
-        <small>{st.dated} de {st.total} atividades com data{st.late.length ? ` · ${st.late.length} atrasada(s)` : ""}{st.next ? ` · próxima: ${st.next.activity} (${brDate(st.next.start || st.next.end)})` : ""}{p.schedule?.updatedAt ? ` · salvo ${new Date(p.schedule.updatedAt).toLocaleDateString("pt-BR")}${p.schedule.updatedBy ? ` por ${p.schedule.updatedBy}` : ""}` : ""}</small></button>
+      <button type="button" className="tg" onClick={() => setOpen(o => !o)} aria-expanded={open}><h3><CalendarRange size={17} /> Cronograma de implantação{p.flow === "simples" && <span className="v34-flowchip">Customização</span>}</h3>
+        <small>{st.dated} de {st.total} atividades com data{st.late.length ? ` · ${st.late.length} atrasada(s)` : ""}{st.next ? ` · próxima: ${st.next.activity} (${brDate(st.next.start || st.next.end)})` : ""}{` · avanço do projeto ${progressInfo(p).pct}% (${progressInfo(p).source === "cronograma" ? `${(progressInfo(p).done || 0) + (progressInfo(p).implied || 0)} de ${progressInfo(p).total} concluídas` : progressInfo(p).detail})`}{p.schedule?.updatedAt ? ` · salvo ${new Date(p.schedule.updatedAt).toLocaleDateString("pt-BR")}${p.schedule.updatedBy ? ` por ${p.schedule.updatedBy}` : ""}` : ""}</small></button>
       <div className="acts">
         <a className="btn outline small v31-link" href={`/linha-do-tempo?projeto=${p.id}`} title="Ver a linha do tempo deste projeto (quem entrou em cada fase, diário e paradas)"><GanttV31 size={14} /> Linha do tempo</a>
         <button type="button" className="btn outline small" disabled={dirty} title={dirty ? "Salve antes de gerar" : "Abrir o PDF"} onClick={() => dl("pdf", true)}><Eye size={14} /> Ver PDF</button>

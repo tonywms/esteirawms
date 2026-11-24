@@ -15,7 +15,7 @@ const TABLES = {
     integration_owner: "text", implementation_owner: "text", blocker: "text", readiness: "json", last_movement: "date", initial_milestone: "date",
     integration_delivery: "date", homologation_date: "date", go_live_date: "date", implementation_start: "date", notes: "text",
     phase: "textnull", phases: "json", ball_with: "textnull", next_action: "textnull", next_action_owner: "textnull", next_action_due: "date",
-    archived_at: "ts", source: "json", extra_docs: "json", infra: "json", schedule: "json", journal: "json", created_at: "ts", updated_at: "ts",
+    archived_at: "ts", source: "json", extra_docs: "json", infra: "json", schedule: "json", journal: "json", progress_mode: "textnull", flow: "textnull", created_at: "ts", updated_at: "ts",
   }),
   tasks: T({ id: "text", project_id: "text", client_id: "text", title: "text", owner: "text", start_date: "date", due_date: "date", status: "text", blocker: "text", notes: "text", sla_original: "textnull", source: "json", attachments: "json", created_at: "ts", updated_at: "ts" }),
   appointments: T({ id: "text", project_id: "text", client_id: "text", consultant: "text", date: "date", shift: "text", modality: "text", title: "text", status: "text", notes: "text", message: "text", source_week: "textnull", source: "json", created_at: "ts", updated_at: "ts" }),
