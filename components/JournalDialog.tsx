@@ -40,9 +40,9 @@ export default function JournalDialog({ data, target, me, onClose, onSaved }: { 
       // se mudou de projeto ao editar, remove do anterior
       if (e0 && e0.projectId !== projectId) {
         const old = data.projects.find(p => p.id === e0.projectId);
-        if (old) await fetch(`/api/records/projects/${old.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ journal: (old.journal || []).filter(x => x.id !== e0.id) }) });
+        if (old) await fetch(`/api/records/projects/${old.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ journal: (Array.isArray(old.journal) ? old.journal : []).filter(x => x.id !== e0.id) }) });
       }
-      const list = (project.journal || []).filter(x => x.id !== entry.id);
+      const list = (Array.isArray(project.journal) ? project.journal : []).filter(x => x.id !== entry.id);
       const journal = del ? list : [...list, entry].sort((a, b) => a.date.localeCompare(b.date));
       const body: Record<string, unknown> = { journal };
       if (!del && doneRows.length && project.schedule?.rows?.length) body.schedule = { ...project.schedule, rows: project.schedule.rows.map(r => doneRows.includes(r.id) ? { ...r, done: true } : r), updatedAt: now, updatedBy: me || undefined };

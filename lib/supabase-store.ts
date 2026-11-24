@@ -46,7 +46,7 @@ function toRow(table: Table, obj: Row): Row {
       case "boolf": out[col] = v === true || v === "true"; break;
       case "date": out[col] = typeof v === "string" && ISO_DAY.test(v) ? v.slice(0, 10) : null; break;
       case "ts": out[col] = typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : col === "archived_at" ? null : new Date().toISOString(); break;
-      case "json": out[col] = v == null ? (col === "source" ? null : col === "attachments" || col === "signers" || col === "extra_docs" ? [] : {}) : v; break;
+      case "json": out[col] = v == null ? (col === "source" ? null : col === "attachments" || col === "signers" || col === "extra_docs" || col === "journal" ? [] : {}) : v; break;
     }
   }
   return out;
@@ -81,7 +81,7 @@ export async function sbLoad(): Promise<State> {
   return {
     version: 1, importedAt: String(meta.imported_at || ""), sourceFile: String(meta.source_file || ""),
     clients: list("clients") as unknown as State["clients"],
-    projects: (list("projects") as unknown as State["projects"]).map(p => ({ ...p, timeline: byProject.get(p.id) || [] })),
+    projects: (list("projects") as unknown as State["projects"]).map(p => ({ ...p, journal: Array.isArray(p.journal) ? p.journal : [], timeline: byProject.get(p.id) || [] })), // V35.1: diário sempre lista
     tasks: list("tasks") as unknown as State["tasks"],
     appointments: list("appointments") as unknown as State["appointments"],
     staff: list("staff") as unknown as State["staff"],

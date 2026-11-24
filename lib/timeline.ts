@@ -79,7 +79,7 @@ export function projectTimeline(s: State, p: Project, today: string) {
     const cl = clientNames(r, client?.info);
     if (cl.length || /cliente|key user|patrocinador|ti cliente/i.test(r.client)) segs.push({ id: `c-${r.id}-cli`, kind: "crono", label: r.activity, start, end, phase: k, termo: r.done ? "ok" : null, person: `Cliente · ${cname}`, projectId: p.id, detail: cl.join(", ") || r.client });
   }
-  const entries: Entry[] = (p.journal || []).map(e => ({ ...e, projectId: p.id }));
+  const entries: Entry[] = (Array.isArray(p.journal) ? p.journal : []).map(e => ({ ...e, projectId: p.id }));
   return { client: cname, segs, entries, apps };
 }
 
