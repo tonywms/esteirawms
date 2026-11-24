@@ -4,23 +4,26 @@
 // V32 · Logo do cliente ao lado do nome.
 // V36 · Recarrega sozinha quando sai uma versão nova do site.
 // V37 · Cabe sempre numa tela: a visão encolhe até caber e as listas mostram só o que cabe inteiro, com "+N mais".
+// V38 · Gestão à vista em 4 telas: Pulso de hoje · Esteira por fases · Atacar primeiro · Linha do tempo da semana.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, FileX2, Hand, LockKeyhole, Maximize2, Rocket, Timer, TrendingUp, Unlock, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, CalendarX2, CheckCircle2, FileCheck2, Hand, Maximize2, Rocket, Siren, TrendingUp, Trophy, Wrench } from "lucide-react";
 import type { State } from "@/lib/types";
-import { PHASES, ballOf, docStates, flowSummary, phaseIndex, phaseOwner, unlockSummary, type Health } from "@/lib/flow";
+import { PHASES, ballOf, flowSummary, phaseOwner, type Health } from "@/lib/flow";
 import { fmtDate, todayISO } from "@/lib/metrics";
-import { avatarUrl, registerAvatars } from "@/lib/avatars";
+import { registerAvatars } from "@/lib/avatars";
 import { registerLogos } from "@/lib/logos";
 import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
-import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
+import { attackFirst, heatmap } from "@/lib/gargalos";
+import { tvPulse, tvRisks } from "@/lib/tv-pulse";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
 import VersionWatcher from "./VersionWatcher";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
 const empty: State = { version: 1, importedAt: "", sourceFile: "", clients: [], projects: [], tasks: [], appointments: [], staff: [], users: [], audit: [] };
 const order: Record<Health, number> = { red: 0, amber: 1, green: 2, done: 3 };
-const VIEWS = ["Esteira por fases", "Destravar a onda", "Gargalos, go-lives e agenda", "Mapa de gargalos", "Linha do tempo da semana"];
+const VIEWS = ["Pulso de hoje", "Esteira por fases", "Atacar primeiro", "Linha do tempo da semana"];
+const TL = 3; // índice da linha do tempo
 const N = VIEWS.length;
 
 export default function TvPanel() {
@@ -28,7 +31,7 @@ export default function TvPanel() {
   const [view, setView] = useState(0), [now, setNow] = useState(() => new Date());
   const stage = useRef<HTMLDivElement>(null), [vp, setVp] = useState("");
   const [tlMs, setTlMs] = useState(ROTATE_MS); // V37: a linha do tempo fica o tempo de mostrar todas as páginas
-  useEffect(() => { const t = setTimeout(() => setView(v => (v + 1) % N), view === 4 ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS); return () => clearTimeout(t); }, [view, tlMs]);
+  useEffect(() => { const t = setTimeout(() => setView(v => (v + 1) % N), view === TL ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS); return () => clearTimeout(t); }, [view, tlMs]);
   useEffect(() => { const r = () => setVp(`${window.innerWidth}x${window.innerHeight}`); r(); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
   useLayoutEffect(() => { const el = stage.current; if (!el) return; fitTv(el); const t = setTimeout(() => fitTv(el), 700), t2 = setTimeout(() => fitTv(el), 2500); return () => { clearTimeout(t); clearTimeout(t2); }; }, [data, view, vp]);
   const load = useCallback(async () => {
@@ -38,24 +41,11 @@ export default function TvPanel() {
   useEffect(() => { void load(); const a = setInterval(() => void load(), REFRESH_MS), c = setInterval(() => setNow(new Date()), 1000); return () => { clearInterval(a); clearInterval(c); }; }, [load]);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") setView(v => (v + 1) % N); if (e.key === "f") void document.documentElement.requestFullscreen?.(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
   const s = useMemo(() => flowSummary(data), [data]);
-  const u = useMemo(() => unlockSummary(data), [data]);
-  // V28.1 · Documentos anexados nas últimas 48 h (mostra na TV que o anexo entrou)
-  const recent = useMemo(() => {
-    const lim = Date.now() - 48 * 3600e3, out: { id: string; client: string; letter: string; doc: string; at: string; by?: string }[] = [];
-    for (const p of data.projects) {
-      const client = data.clients.find(c => c.id === p.clientId)?.name || p.name;
-      for (const ph of PHASES) { const d = p.phases?.[ph.key]?.doc; if (d?.uploadedAt && new Date(d.uploadedAt).getTime() >= lim) out.push({ id: `${p.id}-${ph.key}`, client, letter: ph.letter, doc: ph.doc.replace("Documento de ", ""), at: d.uploadedAt, by: d.uploadedBy }); }
-      for (const x of p.extraDocs || []) { const t = x.signed?.uploadedAt; if (t && new Date(t).getTime() >= lim) out.push({ id: `${p.id}-${x.id}`, client, letter: "+", doc: x.title, at: t, by: x.manual?.by || x.uploadedBy }); }
-    }
-    return out.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8);
-  }, [data]);
   const hm = useMemo(() => heatmap(data, "fase"), [data]);
-  const gs = useMemo(() => gargalosSummary(data), [data]);
-  const atk = useMemo(() => attackFirst(hm.heats, 5), [hm.heats]);
+  const atk = useMemo(() => attackFirst(hm.heats, 8), [hm.heats]);
+  const pulse = useMemo(() => tvPulse(data), [data]);
+  const risks = useMemo(() => tvRisks(data), [data]);
   const name = (id: string) => data.clients.find(c => c.id === id)?.name || "Cliente";
-  const today = todayISO();
-  const agenda = data.appointments.filter(a => a.date === today && a.status !== "Cancelado").sort((a, b) => a.consultant.localeCompare(b.consultant));
-  const active = s.reports.filter(r => r.h.health !== "done").length;
 
   return <div className="v7-tv" onDoubleClick={() => void document.documentElement.requestFullscreen?.()}>
     <VersionWatcher mode="tv" />
@@ -67,95 +57,67 @@ export default function TvPanel() {
       <button className="v7-tv-full" onClick={() => void document.documentElement.requestFullscreen?.()} aria-label="Tela cheia"><Maximize2 size={18} /></button>
     </header>
 
-    <section className="v7-tv-kpis">
-      <div className="k red"><LockKeyhole /><strong>{u.blocked.length}</strong><span>Travados por PDF<small>{u.blocked.filter(g => g.state === "sent").length} aguardando assinatura</small></span></div>
-      <div className="k green"><Unlock /><strong>{u.ready.length}</strong><span>Prontos para avançar<small>PDF OK · falta mover</small></span></div>
-      <div className="k cyan"><TrendingUp /><strong>{u.movedWeek}</strong><span>Avançaram em 7 dias<small>{s.goLives.length ? `${s.goLives.length} go-live(s) na semana` : "mudanças de fase"}</small></span></div>
-      <div className="k amber"><AlertTriangle /><strong>{s.red}</strong><span>Críticos<small>{s.amber} em atenção</small></span></div>
-      <div className="k ball"><Hand /><div>{s.ball.map(b => <b key={b.name}><i>{b.count}</i>{b.name}</b>)}</div><span>Bola com · {active} ativos</span></div>
-    </section>
-
     <div className="v37-stage" ref={stage}>
-    {view === 0 ? <section className="v7-tv-flow" style={{ gridTemplateColumns: `repeat(${PHASES.length - 1}, minmax(0,1fr))` }}>
+    {view === 0 ? <section className="v38-pulse">
+      <div className="v38-kpis">
+        <div className="k cyan"><Rocket /><div><strong>{pulse.goLives.length}</strong><span>Go-lives em 30 dias</span><small>{pulse.goLives[0] ? `próximo: ${name(pulse.goLives[0].clientId)} · ${fmtDate(pulse.goLives[0].goLiveDate)}` : pulse.noDate ? `${pulse.noDate} projeto(s) sem data prometida` : "nenhum previsto"}</small></div></div>
+        <div className={`k ${pulse.thisWeek >= pulse.avg4 && pulse.thisWeek > 0 ? "green" : "amber"}`}><TrendingUp /><div><strong>{pulse.thisWeek}</strong><span>Fases avançadas na semana</span><small>média das 4 semanas anteriores: {String(pulse.avg4).replace(".", ",")}</small></div>
+          <i className="spark">{pulse.weeks.map((w, i) => <b key={i} title={`${fmtDate(w.start)} a ${fmtDate(w.end)}: ${w.n}`} style={{ height: `${Math.max(8, (w.n / Math.max(1, ...pulse.weeks.map(x => x.n))) * 100)}%` }} className={i === 5 ? "now" : ""} />)}</i></div>
+        <div className="k red"><AlertTriangle /><div><strong>{pulse.red}</strong><span>Críticos</span><small>{pulse.amber} em atenção · {pulse.active} ativos</small></div></div>
+        <div className="k amber"><Hand /><div><strong>{pulse.out.length}</strong><span>Bola com cliente / ERP</span><small>{pulse.outLong.length ? `${pulse.outLong.length} parado(s) há 5 dias ou mais` : "nenhum parado há 5+ dias"}</small></div></div>
+      </div>
+      <div className="v38-pulse-grid">
+        <div className="panel-tv">
+          <h3><CalendarClock /> Quem está onde <em>hoje e {new Date(pulse.nextDay + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" }).replace(".", "")}</em></h3>
+          <div className="rows">{pulse.who.map(w => <div key={w.person} className="row who">
+            <PersonPhoto name={w.person} size={44} /><div className="nm"><strong>{w.person}</strong></div>
+            <div className="dayc"><small>Hoje</small>{w.today.length ? w.today.map(a => <b key={a.id} className="v32-nm"><ClientLogo clientId={a.clientId} size={22} />{name(a.clientId)}<em>{a.shift}</em></b>) : <span className="free">livre</span>}</div>
+            <div className="dayc next"><small>{new Date(pulse.nextDay + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}</small>{w.tomorrow.length ? w.tomorrow.map(a => <b key={a.id} className="v32-nm"><ClientLogo clientId={a.clientId} size={22} />{name(a.clientId)}<em>{a.shift}</em></b>) : <span className="free">livre</span>}</div>
+          </div>)}
+            {!pulse.who.length && <div className="muted">Ninguém alocado na agenda para hoje e o próximo dia útil</div>}</div>
+        </div>
+        <div className="panel-tv v38-wins">
+          <h3><Trophy /> Conquistas da semana <em>{pulse.wins.length}</em></h3>
+          <div className="rows">{pulse.wins.map(w => <div key={w.id} className={`row win ${w.kind}`}><i>{w.kind === "golive" ? <Rocket size={18} /> : w.kind === "doc" ? <FileCheck2 size={18} /> : <ArrowRight size={18} />}</i><div><strong className="v32-nm"><ClientLogo clientId={w.clientId} size={24} />{w.text}</strong><small>{new Date(w.at).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })}</small></div></div>)}
+            {!pulse.wins.length && <div className="muted">Nenhuma fase avançada nem termo anexado nos últimos 7 dias</div>}</div>
+        </div>
+      </div>
+    </section> : view === 1 ? <section className="v7-tv-flow v38-flow" style={{ gridTemplateColumns: `repeat(${PHASES.length - 1}, minmax(0,1fr))` }}>
       {s.byPhase.filter(ph => ph.key !== "fim").map((ph, i) => <div key={ph.key} className="col">
         <header><span>{i + 1}</span><strong>{ph.short}</strong><em>{ph.items.length}</em></header>
-        <div className="list">{[...ph.items].sort((a, b) => order[a.h.health] - order[b.h.health]).slice(0, 8).map(({ p, h }) =>
-          <div key={p.id} className={`c ${h.health}`}><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d</small>{h.health !== "done" && (docStates(p).some(d => d.state === "pending" || d.state === "missing") ? <em className="pdf" title="Documento pendente"><FileX2 />PDF</em> : docStates(p).some(d => d.state === "sent") ? <em className="pdf sent" title="Aguardando assinatura do cliente"><FileClock />ASSIN.</em> : null)}</div>)}
-          {ph.items.length > 8 && <div className="more">+{ph.items.length - 8} projetos</div>}
+        <div className="list">{[...ph.items].sort((a, b) => order[a.h.health] - order[b.h.health] || (b.h.inPhase ?? 0) - (a.h.inPhase ?? 0)).map(({ p, h }) =>
+          <div key={p.id} className={`c ${h.health}`} title={h.reasons[0] || ""}><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d{ballOf(p) !== "WMS Expert" ? ` · bola: ${ballOf(p)}` : ""}</small></div>)}
         </div>
       </div>)}
-    </section> : view === 1 ? <section className="v8-tv-unlock">
-      <div className="v8-cov">{u.coverage.map(c => <div key={c.key} className={c.pct >= 80 ? "good" : c.pct >= 50 ? "mid" : "bad"}>
-        <b>{c.letter}</b><div><strong>{c.short}</strong><small>{c.ok}/{c.need} PDFs OK{c.sent ? ` · ${c.sent} na assinatura` : ""}</small></div><em>{c.pct}%</em><i><s style={{ width: `${c.pct}%` }} /></i>
-      </div>)}</div>
-      {recent.length > 0 && <div className="v281-recent"><span className="t"><CheckCircle2 size={16} /> Anexados nas últimas 48h</span>{recent.map(r => <span key={r.id} className="it"><b>{r.letter}</b>{r.client} · {r.doc}<small>{new Date(r.at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>)}</div>}
-      <div className="v8-unlock-grid">
-        <div className="panel-tv">
-          <h3><Unlock /> Prontos para avançar <em>{u.ready.length}</em></h3>
-          <div className="rows">{u.ready.slice(0, 6).map(({ p, from, to }) => <div key={p.id} className="row ready"><i /><div><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{PHASES[phaseIndex(from)].short} <ArrowRight size={12} /> {from === "homolog" ? "Implantação / Go-live" : PHASES[phaseIndex(to)].short}</small></div><span className="ball">{phaseOwner(p)}</span></div>)}
-            {u.ready.length > 6 && <div className="more">+{u.ready.length - 6} projetos</div>}
-            {!u.ready.length && <div className="muted">Nenhum card com PDF OK parado na fase</div>}</div>
-        </div>
-        <div className="panel-tv">
-          <h3><FileX2 /> Falta PDF para avançar <em>{u.blocked.length}</em></h3>
-          <div className="rows">{u.blocked.slice(0, 6).map(g => <div key={g.p.id + g.key} className={`row ${g.state === "sent" ? "sent" : "red"}`}><i /><div><strong className="v32-nm"><ClientLogo clientId={g.p.clientId} size={28} />{name(g.p.clientId)}</strong><small>{g.state === "sent" ? <FileClock size={13} /> : <FileX2 size={13} />} {g.doc}</small></div><span className="ball">{g.state === "sent" ? "Assinatura do cliente" : g.owner}</span><span className="days"><Timer size={15} />{g.days}d</span></div>)}
-            {u.blocked.length > 6 && <div className="more">+{u.blocked.length - 6} projetos · os mais antigos aparecem primeiro</div>}
-            {!u.blocked.length && <div className="ok"><CheckCircle2 /> Todas as fases atuais com PDF</div>}</div>
-        </div>
-        <div className="panel-tv">
-          <h3><Users /> Quem precisa entregar <em>{u.gaps.length}</em></h3>
-          <div className="rows">{u.owners.slice(0, 5).map(o => <div key={o.name} className={`row owner ${o.name.startsWith("Cliente") ? "sent" : o.blocks ? "red" : "amber"}`}><i /><div><strong>{o.name}</strong><small>{Object.entries(o.letters).sort((a, b) => "KDHIG".indexOf(a[0]) - "KDHIG".indexOf(b[0])).map(([l, n]) => `${n}× ${l}`).join(" · ")}{o.total - o.blocks ? ` · ${o.total - o.blocks} retroativo(s)` : ""}</small></div><span className="count">{o.blocks}<small>travando</small></span></div>)}
-            {u.owners.length > 5 && <div className="more">+{u.owners.length - 5} responsáveis</div>}
-            {!u.owners.length && <div className="ok"><CheckCircle2 /> Nenhum documento pendente</div>}</div>
-          <p className="v8-legend">K endereçamento · D integração · H homologação · I implantação · G go-live</p>
-        </div>
-      </div>
-    </section> : view === 4 ? <TvTimeline data={data} onDuration={setTlMs} />
-    : view === 3 ? <section className="v17-tv">
-      <div className="panel-tv v17-tv-heat">
-        <h3><AlertTriangle /> Onde a esteira está travando <em>{gs.pctInGoal === null ? "—" : `${gs.pctInGoal}% na meta`}</em></h3>
-        <div className="v17-tv-grid" style={{ gridTemplateColumns: `minmax(0,1.3fr) repeat(${DIMS.length}, minmax(0,1fr))` }}>
-          <span />{DIMS.map(d => <span key={d.key} className="h">{d.label}</span>)}
-          {hm.rows.map(r => <div key={r.key} style={{ display: "contents" }}><span className="r"><b>{r.label}</b><small>{r.total} proj.</small></span>
-            {DIMS.map(d => { const c = r.cells[d.key]; return <span key={d.key} className={`c l${c.level}`}><b>{c.text}</b><small>{c.sub}</small></span>; })}</div>)}
-        </div>
-      </div>
+    </section> : view === 2 ? <section className="v38-attack">
       <div className="panel-tv">
-        <h3><Rocket /> Atacar primeiro <em>{atk.length}</em></h3>
-        <div className="rows">{atk.map((a, i) => <div key={a.h.p.id} className={`row ${i < 2 ? "red" : "amber"}`}><i /><div><strong>{i + 1}. {a.h.client}</strong><small>{a.problem}</small></div></div>)}
-          {!atk.length && <div className="ok"><CheckCircle2 /> Nenhum gargalo agora</div>}</div>
-      </div>
-    </section> : <section className="v7-tv-split">
-      <div className="panel-tv">
-        <h3><AlertTriangle /> Gargalos e empecilhos <em>{s.critical.length + s.attention.length}</em></h3>
-        <div className="rows">{[...s.critical, ...s.attention].slice(0, 7).map(({ p, h }) => <div key={p.id} className={`row ${h.health}`}>
-          <i />
-          <div><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{h.reasons[0] || ""}</small></div>
-          <span className="ball"><Hand size={15} />{ballOf(p)}</span>
-          <span className="days"><Timer size={15} />{h.idle ?? 0}d</span>
+        <h3><Siren /> Atacar primeiro <em>{atk.length}</em></h3>
+        <div className="rows">{atk.map((a, i) => <div key={a.h.p.id} className={`row ${i < 3 ? "red" : "amber"}`}>
+          <span className="rank">{i + 1}</span>
+          <div><strong className="v32-nm"><ClientLogo clientId={a.h.p.clientId} size={28} />{a.h.client}</strong><small>{a.problem}</small><small className="nx">{a.next}</small></div>
+          <span className="ball"><Hand size={15} />{a.h.ball}</span>
+          <span className="own"><PersonPhoto name={a.h.owner} size={26} />{a.h.owner}</span>
         </div>)}
-          {s.critical.length + s.attention.length > 7 && <div className="more">+{s.critical.length + s.attention.length - 7} projetos · os mais parados aparecem primeiro</div>}
-          {!s.critical.length && !s.attention.length && <div className="ok"><CheckCircle2 /> Nenhum gargalo agora</div>}</div>
+          {!atk.length && <div className="ok"><CheckCircle2 /> Nada urgente agora</div>}</div>
       </div>
       <div className="stack">
-        {s.goLives.length > 0 && <div className="panel-tv">
-          <h3><Rocket /> Go-lives próximos 7 dias <em>{s.goLives.length}</em></h3>
-          <div className="rows">{s.goLives.slice(0, 4).map(({ p }) => <div key={p.id} className="row golive"><i /><div><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{phaseOwner(p)}</small></div><span className="date">{fmtDate(p.goLiveDate)}</span></div>)}
-</div>
-        </div>}
         <div className="panel-tv">
-          <h3><CalendarClock /> Agenda de hoje <em>{agenda.length}</em></h3>
-          <div className="rows">{agenda.slice(0, s.goLives.length ? 4 : 8).map(a => <div key={a.id} className={`row agenda ${avatarUrl(a.consultant) ? "v19-tv-face" : ""}`}>{avatarUrl(a.consultant) ? <PersonPhoto name={a.consultant} size={40} /> : <i />}<div><strong>{a.consultant}</strong><small>{name(a.clientId)} · {a.title}</small></div><span className="date">{a.shift}</span></div>)}
-            {agenda.length > (s.goLives.length ? 4 : 8) && <div className="more">+{agenda.length - (s.goLives.length ? 4 : 8)} alocações</div>}
-            {!agenda.length && <div className="muted">Sem consultores alocados hoje</div>}</div>
+          <h3><CalendarX2 /> Go-lives em risco <em>{risks.risk.length}</em></h3>
+          <div className="rows">{risks.risk.map(f => <div key={f.p.id} className={`row ${f.status === "atrasado" ? "red" : "amber"}`}><i /><div><strong className="v32-nm"><ClientLogo clientId={f.p.clientId} size={26} />{f.client}</strong><small>prometido {fmtDate(f.promised)} · previsto {fmtDate(f.forecast)} · {risks.phaseShort(f.phase)}</small></div><span className="days">+{f.diff ?? 0} du</span></div>)}
+            {!risks.risk.length && <div className="ok"><CheckCircle2 /> Nenhum go-live prometido em risco</div>}</div>
+        </div>
+        <div className="panel-tv">
+          <h3><Wrench /> Infra pendente p/ go-live <em>{risks.infra.length}</em></h3>
+          <div className="rows">{risks.infra.map(x => <div key={x.f.p.id} className={`row ${x.late ? "red" : "amber"}`}><i /><div><strong className="v32-nm"><ClientLogo clientId={x.f.p.clientId} size={26} />{x.f.client}</strong><small>{x.text}</small></div><span className="date">{fmtDate(x.f.promised || x.f.forecast)}</span></div>)}
+            {!risks.infra.length && <div className="ok"><CheckCircle2 /> Infra em dia nos próximos go-lives</div>}</div>
         </div>
       </div>
-    </section>}
+    </section> : <TvTimeline data={data} onDuration={setTlMs} />}
     </div>
 
     <footer className="v7-tv-foot">
       <span className={`live ${err ? "off" : ""}`} />{err || `Atualizado ${updated ? updated.toLocaleTimeString("pt-BR") : "—"} · atualização automática a cada 30s · troca de visão a cada 20s`}
-      <span className="bar" key={view} style={{ animationDuration: `${(view === 4 ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS) / 1000}s` }} />
+      <span className="bar" key={view} style={{ animationDuration: `${(view === TL ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS) / 1000}s` }} />
     </footer>
   </div>;
 }
