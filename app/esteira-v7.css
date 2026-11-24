@@ -1974,3 +1974,21 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v34-ck input { width: 15px; height: 15px; accent-color: #1aa6d6; }
 .v34-hint { font-size: 11px; color: #6b7c90; margin-top: 4px; display: block; }
 .v34-flowchip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #7a4bd1; background: #f3edff; border: 1px solid #e0d3fb; border-radius: 99px; padding: 1px 7px; }
+
+/* ===== V35 · Cards de responsáveis alinhados + linha de avanço colorida ===== */
+.shell.ent-shell .v29-person.empty, .v29-person.empty { position: static; padding: 10px 12px; flex-direction: row; align-items: flex-start; justify-content: flex-start; text-align: left; }
+.v29-people { align-items: stretch; }
+.shell.ent-shell .progress-line.v35-seg { display: flex; gap: 2px; overflow: hidden; }
+.shell.ent-shell .progress-line.v35-seg span { flex: none; background: linear-gradient(90deg, #15803d, #22c55e); box-shadow: 0 0 10px -2px rgba(34, 197, 94, .65); }
+.shell.ent-shell .progress-line.v35-seg i { flex: 1; min-width: 4px; border-radius: 99px; background: repeating-linear-gradient(-45deg, #f59e0b 0 6px, #fbbf24 6px 12px); opacity: .85; animation: v35-move 1.6s linear infinite; background-size: 17px 17px; }
+.shell.ent-shell .progress-line.v35-block i { background: repeating-linear-gradient(-45deg, #dc2626 0 6px, #f87171 6px 12px); background-size: 17px 17px; opacity: .9; }
+@keyframes v35-move { from { background-position: 0 0; } to { background-position: 17px 0; } }
+@media (prefers-reduced-motion: reduce) { .shell.ent-shell .progress-line.v35-seg i { animation: none; } }
+.ent-progress-inline.v35-inline:before { background: #fbd38d; }
+.ent-progress-inline.v35-inline.v35-block:before { background: #fca5a5; }
+.ent-progress-inline.v35-inline i { background: #22c55e; }
+.ent-delivery-track { background: #fde3b0 !important; } .ent-delivery-track i { background: linear-gradient(90deg, #15803d, #22c55e) !important; }
+.v35-ms-ok .milestone-dot { border-color: #16a34a !important; background: #22c55e !important; box-shadow: 0 0 0 3px rgba(34, 197, 94, .18) !important; }
+.v35-ms-pend .milestone-dot, .v35-ms-none .milestone-dot { border-color: #f59e0b !important; background: #fff7e6 !important; box-shadow: 0 0 0 3px rgba(245, 158, 11, .16) !important; }
+.v35-ms-late .milestone-dot { border-color: #dc2626 !important; background: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239, 68, 68, .18) !important; }
+.v35-ms-ok > span:nth-child(2) { color: #15803d; font-weight: 600; } .v35-ms-late > span:nth-child(2) { color: #b91c1c; font-weight: 600; }
