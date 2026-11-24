@@ -60,7 +60,9 @@ export function clientPeople(info?: ClientInfo | null): { key: string; label: st
   const out: { key: string; label: string; person: ClientPerson }[] = [];
   if (info?.sponsor?.name) out.push({ key: "sponsor", label: "Patrocinador", person: info.sponsor });
   (info?.keyUsers || []).forEach((k, i) => { if (k?.name) out.push({ key: `ku${i + 1}`, label: `Key user ${i + 1}`, person: k }); });
-  if (info?.itSupport?.name) out.push({ key: "ti", label: "Suporte TI", person: info.itSupport });
+  if (info?.itSupport?.name) out.push({ key: "ti", label: "TI · integração", person: info.itSupport });
+  if (info?.itSecondary?.name) out.push({ key: "ti2", label: "TI secundário", person: info.itSecondary }); // V33
+  if (info?.logisticsManager?.name) out.push({ key: "log", label: "Gestor de logística", person: info.logisticsManager }); // V33
   return out;
 }
 export const clientDisplayName = (c?: Client | null) => (c?.info?.tradeName || c?.name || "Cliente").trim();
@@ -107,7 +109,8 @@ export function clientNames(r: ScheduleRow, info?: ClientInfo | null): string[] 
   if (r.clientPeople?.length) return r.clientPeople.map(k => ppl.find(x => x.key === k)?.person.name || "").filter(Boolean);
   const t = nrm(r.client);
   if (t.includes("key user")) return (info?.keyUsers || []).map(k => k.name).filter(Boolean);
-  if (t.includes("patrocinador") || t.includes("gestor cliente")) return info?.sponsor?.name ? [info.sponsor.name] : [];
-  if (t.includes("ti cliente")) return info?.itSupport?.name ? [info.itSupport.name] : [];
+  if (t.includes("gestor cliente") || t.includes("logistica")) { const g = info?.logisticsManager?.name || info?.sponsor?.name; return g ? [g] : []; } // V33
+  if (t.includes("patrocinador")) return info?.sponsor?.name ? [info.sponsor.name] : [];
+  if (t.includes("ti cliente")) return [info?.itSupport?.name, info?.itSecondary?.name].filter(Boolean) as string[]; // V33: TI integração + secundário
   return [];
 }

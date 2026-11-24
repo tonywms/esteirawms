@@ -20,7 +20,9 @@ export function buildScheduleXlsx(project: Project, client: Client | undefined, 
   const info2: [string, string][] = [
     ["Razão social", info.legalName || client?.name || "—"], ["Nome fantasia", info.tradeName || "—"], ["CNPJ", fmtCnpj(info.cnpj) || "—"], ["Patrocinador", person(info.sponsor)],
     ...[0, 1, 2].filter(i => i === 0 || info.keyUsers?.[i]?.name).map(i => [`Key user ${i + 1}`, person(info.keyUsers?.[i])] as [string, string]),
-    ...(info.itSupport?.name ? [["Suporte TI", person(info.itSupport)] as [string, string]] : []),
+    ...(info.itSupport?.name ? [["TI · integração", person(info.itSupport)] as [string, string]] : []),
+    ...(info.itSecondary?.name ? [["TI secundário", person(info.itSecondary)] as [string, string]] : []),
+    ...(info.logisticsManager?.name ? [["Gestor de logística", person(info.logisticsManager)] as [string, string]] : []),
     ["Projeto", project.name], ["Consultor WMS Expert", opts.consultant || "—"], ["Emitido em", new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })],
   ];
   for (const [k, v] of info2) { const rr = put([null, t(k, { size: 10, color: SUB }), t(v, { bold: true, size: 10, color: DARK })]); merges.push(`C${rr}:H${rr}`); }

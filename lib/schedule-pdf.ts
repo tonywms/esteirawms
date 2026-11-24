@@ -63,7 +63,9 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
       ["Razão social", info.legalName || client?.name || "—"], ["Nome fantasia", info.tradeName || "—"], ["CNPJ", fmtCnpj(info.cnpj) || "—"],
       ["Patrocinador", line(info.sponsor)],
       ...[0, 1, 2].filter(i => i === 0 || info.keyUsers?.[i]?.name).map(i => [`Key user ${i + 1}`, line(info.keyUsers?.[i])] as [string, string]),
-      ...(info.itSupport?.name ? [["Suporte TI", line(info.itSupport)] as [string, string]] : []),
+      ...(info.itSupport?.name ? [["TI · integração", line(info.itSupport)] as [string, string]] : []),
+      ...(info.itSecondary?.name ? [["TI secundário", line(info.itSecondary)] as [string, string]] : []),
+      ...(info.logisticsManager?.name ? [["Gestor de logística", line(info.logisticsManager)] as [string, string]] : []),
       ["Projeto", project.name], ["Consultor WMS Expert", opts.consultant || "—"],
       ...TEAM_ROLES.filter(r => project.schedule?.team?.[r.key]).map(r => [`${r.label} (WMS Expert)`, String(project.schedule!.team![r.key])] as [string, string]), ["Data de emissão", new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })],
     ];

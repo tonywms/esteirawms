@@ -102,7 +102,7 @@ export function buildEscopoDocx(project: Project, client: Client | undefined, op
           let t = addNameToBox(tbl, "Especialista 1", personLines(info.keyUsers?.[0]));
           const k2 = [...personLines(info.keyUsers?.[1]), ...(info.keyUsers?.[2]?.name ? [info.keyUsers[2].name] : [])];
           t = addNameToBox(t, "Especialista 2", k2);
-          return addNameToBox(t, "Suporte TI", personLines(info.itSupport));
+          return addNameToBox(t, "Suporte TI", [...personLines(info.itSupport), ...(info.itSecondary?.name ? [info.itSecondary.name] : [])]); // V33
         }
         if (/^Gestor de Implantação$/.test(txt.trim())) return addNameToBox(tbl, "Gestor de Implantação", team.gestor || consultant ? [team.gestor || consultant] : []);
         if (txt.replace(/\s+/g, "") === "InstrutorQualidade") {

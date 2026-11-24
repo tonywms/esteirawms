@@ -1,6 +1,7 @@
 "use client";
 // V29 · Ficha do cliente: razão social, nome fantasia, CNPJ, patrocinador, key users (até 3) e suporte de TI.
 // Essas pessoas são as responsáveis do cliente no cronograma e saem no PDF/Excel enviado a ele.
+// V33 · TI integração, TI secundário e gestor de logística (nome, e-mail, celular) — viram responsáveis no cronograma.
 // V32 · Logo do cliente (busca no site ou arquivo), site da empresa e dados do RAC preservados ao salvar.
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -35,7 +36,9 @@ export default function ClientProfile({ client, onRefresh, notify, canWrite = tr
     <div className="v29-people">
       <Person label="Patrocinador" p={info.sponsor} star />
       {[0, 1, 2].filter(i => i === 0 || info.keyUsers?.[i]?.name).map(i => <Person key={i} label={`Key user ${i + 1}`} p={info.keyUsers?.[i]} />)}
-      {info.itSupport?.name && <Person label="Suporte TI" p={info.itSupport} />}
+      <Person label="TI · integração" p={info.itSupport} />
+      <Person label="TI secundário" p={info.itSecondary} />
+      <Person label="Gestor de logística" p={info.logisticsManager} />
       {info.owner?.name && <Person label="Proprietário" p={info.owner} />}
       {info.manager?.name && <Person label="Gerente" p={info.manager} />}
     </div>
@@ -47,22 +50,22 @@ export default function ClientProfile({ client, onRefresh, notify, canWrite = tr
 
 function EditDialog({ client, onClose, onSaved }: { client: Client; onClose: () => void; onSaved: () => Promise<void> }) {
   const i0 = client.info || {};
-  const [f, setF] = useState<ClientInfo>({ legalName: i0.legalName || client.name, tradeName: i0.tradeName || "", cnpj: fmtCnpj(i0.cnpj) || "", site: i0.site || "", sponsor: { ...empty, ...i0.sponsor }, keyUsers: (i0.keyUsers?.length ? i0.keyUsers : [empty]).map(k => ({ ...empty, ...k })), itSupport: { ...empty, ...i0.itSupport } });
-  const [busy, setBusy] = useState(false), [err, setErr] = useState(""), [mounted, setMounted] = useState(false), [ti, setTi] = useState(!!i0.itSupport?.name);
+  const [f, setF] = useState<ClientInfo>({ legalName: i0.legalName || client.name, tradeName: i0.tradeName || "", cnpj: fmtCnpj(i0.cnpj) || "", site: i0.site || "", sponsor: { ...empty, ...i0.sponsor }, keyUsers: (i0.keyUsers?.length ? i0.keyUsers : [empty]).map(k => ({ ...empty, ...k })), itSupport: { ...empty, ...i0.itSupport }, itSecondary: { ...empty, ...i0.itSecondary }, logisticsManager: { ...empty, ...i0.logisticsManager } });
+  const [busy, setBusy] = useState(false), [err, setErr] = useState(""), [mounted, setMounted] = useState(false), ti = true;
   useEffect(() => { setMounted(true); const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !busy) onClose(); }; window.addEventListener("keydown", esc); return () => window.removeEventListener("keydown", esc); }, [busy, onClose]);
-  const setP = (k: "sponsor" | "itSupport", v: Partial<ClientPerson>) => setF(x => ({ ...x, [k]: { ...(x[k] as ClientPerson), ...v } }));
+  const setP = (k: "sponsor" | "itSupport" | "itSecondary" | "logisticsManager", v: Partial<ClientPerson>) => setF(x => ({ ...x, [k]: { ...(x[k] as ClientPerson), ...v } }));
   const setK = (i: number, v: Partial<ClientPerson>) => setF(x => ({ ...x, keyUsers: (x.keyUsers || []).map((k, j) => j === i ? { ...k, ...v } : k) }));
   const okMail = (e?: string) => !e || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
   async function save(e: React.FormEvent) {
     e.preventDefault(); if (busy) return;
     if (f.cnpj && !validCnpj(f.cnpj)) return setErr("CNPJ inválido. Confira os 14 dígitos.");
-    const all = [f.sponsor, ...(f.keyUsers || []), ti ? f.itSupport : undefined].filter(Boolean) as ClientPerson[];
+    const all = [f.sponsor, ...(f.keyUsers || []), f.itSupport, f.itSecondary, f.logisticsManager].filter(Boolean) as ClientPerson[];
     const bad = all.find(p => p.name && !okMail(p.email)); if (bad) return setErr(`E-mail inválido para ${bad.name}.`);
     if (all.some(p => !p.name && (p.email || p.phone))) return setErr("Informe o nome de quem tem e-mail ou telefone preenchido.");
     const clean = (p?: ClientPerson) => p?.name?.trim() ? { name: p.name.trim(), email: p.email?.trim() || undefined, phone: (p.phone || "").replace(/\D/g, "") || undefined, role: p.role?.trim() || undefined } : undefined;
     // V32: mantém o que não está neste formulário (dados do RAC, cidade, proprietário, gerente...)
     const info: ClientInfo = { ...i0, site: (f.site || "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "") || undefined, legalName: f.legalName?.trim() || undefined, tradeName: f.tradeName?.trim() || undefined, cnpj: (f.cnpj || "").replace(/\D/g, "") || undefined,
-      sponsor: clean(f.sponsor), keyUsers: (f.keyUsers || []).map(clean).filter(Boolean) as ClientPerson[], itSupport: ti ? clean(f.itSupport) : undefined };
+      sponsor: clean(f.sponsor), keyUsers: (f.keyUsers || []).map(clean).filter(Boolean) as ClientPerson[], itSupport: clean(f.itSupport), itSecondary: clean(f.itSecondary), logisticsManager: clean(f.logisticsManager) };
     setBusy(true); setErr("");
     try {
       const r = await fetch(`/api/records/clients/${client.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ info }) });
@@ -86,9 +89,10 @@ function EditDialog({ client, onClose, onSaved }: { client: Client; onClose: () 
           {i > 0 && <button type="button" className="rm" onClick={() => setF(x => ({ ...x, keyUsers: (x.keyUsers || []).filter((_, j) => j !== i) }))} aria-label={`Remover key user ${i + 1}`}><Trash2 size={14} /></button>}</div>)}
         <div className="adds">
           {(f.keyUsers || []).length < 3 && <button type="button" className="btn outline small" onClick={() => setF(x => ({ ...x, keyUsers: [...(x.keyUsers || []), { ...empty }] }))}><Plus size={14} /> Adicionar key user {(f.keyUsers || []).length + 1}</button>}
-          {!ti && <button type="button" className="btn outline small" onClick={() => setTi(true)}><Plus size={14} /> Suporte de TI do cliente</button>}
         </div>
-        {ti && <PersonFields p={f.itSupport || empty} on={v => setP("itSupport", v)} title="Suporte TI" hint="acompanha integração, rede e equipamentos" />}
+        {ti && <PersonFields p={f.itSupport || empty} on={v => setP("itSupport", v)} title="TI · integração" hint="responsável pela integração com o ERP, rede e equipamentos" />}
+        <PersonFields p={f.itSecondary || empty} on={v => setP("itSecondary", v)} title="TI secundário" hint="substituto do TI de integração" />
+        <PersonFields p={f.logisticsManager || empty} on={v => setP("logisticsManager", v)} title="Gestor de logística" hint="gestor da operação no armazém (treinamento de gestão, go-live)" />
       </div>
       {err && <div className="p6-confirm-error" role="alert">{err}</div>}
       <footer><button type="button" className="btn outline" onClick={onClose} disabled={busy}>Cancelar</button><button type="submit" className="btn primary" disabled={busy}>{busy ? <RefreshCw className="spin" size={14} /> : <Check size={14} />} Salvar</button></footer>
@@ -102,6 +106,6 @@ function PersonFields({ p, on, title, hint }: { p: ClientPerson; on: (v: Partial
     <label><span>Nome</span><input value={p.name} onChange={e => on({ name: e.target.value })} placeholder="Nome completo" /></label>
     <label><span>Cargo / função</span><input value={p.role || ""} onChange={e => on({ role: e.target.value })} placeholder="Ex.: Gerente de logística" /></label>
     <label><span><Mail size={12} /> E-mail</span><input type="email" value={p.email || ""} onChange={e => on({ email: e.target.value })} placeholder="nome@cliente.com.br" /></label>
-    <label><span><Phone size={12} /> Telefone</span><input value={p.phone || ""} onChange={e => on({ phone: e.target.value })} onBlur={e => on({ phone: phoneFmt(e.target.value) })} placeholder="(85) 99999-9999" /></label>
+    <label><span><Phone size={12} /> Celular</span><input value={p.phone || ""} onChange={e => on({ phone: e.target.value })} onBlur={e => on({ phone: phoneFmt(e.target.value) })} placeholder="(85) 99999-9999" /></label>
   </fieldset>;
 }

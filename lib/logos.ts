@@ -43,7 +43,7 @@ export const isFreeMail = (d: string) => FREE.test(d);
 export function clientDomains(c?: Client | null): string[] {
   if (!c) return [];
   const i = c.info || {};
-  const raw = [i.site, i.sponsor?.email, ...(i.keyUsers || []).map(k => k.email), i.itSupport?.email, i.owner?.email, i.manager?.email, ...(c.signers || []).map(s => s.email)];
+  const raw = [i.site, i.sponsor?.email, ...(i.keyUsers || []).map(k => k.email), i.itSupport?.email, i.itSecondary?.email, i.logisticsManager?.email, i.owner?.email, i.manager?.email, ...(c.signers || []).map(s => s.email)];
   const out: string[] = [];
   for (const r of raw) { const d = cleanDomain(r); if (d && !isFreeMail(d) && !/wmsexpert/.test(d) && !out.includes(d)) out.push(d); }
   return out;
