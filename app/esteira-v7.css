@@ -1992,3 +1992,9 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v35-ms-pend .milestone-dot, .v35-ms-none .milestone-dot { border-color: #f59e0b !important; background: #fff7e6 !important; box-shadow: 0 0 0 3px rgba(245, 158, 11, .16) !important; }
 .v35-ms-late .milestone-dot { border-color: #dc2626 !important; background: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239, 68, 68, .18) !important; }
 .v35-ms-ok > span:nth-child(2) { color: #15803d; font-weight: 600; } .v35-ms-late > span:nth-child(2) { color: #b91c1c; font-weight: 600; }
+
+/* ===== V36 · Nova versão publicada ===== */
+.v36-up { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 9999; display: flex; align-items: center; gap: 10px; background: #0b1a2c; color: #e8f3fa; border: 1px solid rgba(26, 166, 214, .5); border-radius: 14px; padding: 10px 12px 10px 14px; box-shadow: 0 18px 40px -12px rgba(4, 13, 26, .6); font-size: 13px; max-width: calc(100vw - 32px); }
+.v36-up b { color: #fff; } .v36-up svg { color: #22d3e6; flex: none; }
+.v36-up button { flex: none; display: inline-flex; gap: 6px; align-items: center; border: 0; border-radius: 10px; padding: 7px 12px; background: linear-gradient(135deg, #1aa6d6, #12b39b); color: #fff; font-weight: 700; cursor: pointer; }
+.v36-tv-up { position: fixed; inset: auto 0 40px 0; margin: auto; width: fit-content; z-index: 9999; display: flex; gap: 12px; align-items: center; background: rgba(11, 26, 44, .95); color: #fff; font-size: 24px; font-weight: 700; padding: 18px 28px; border-radius: 18px; border: 1px solid rgba(34, 211, 230, .5); }

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, authEnabled, onVercel, readSession, safeEqual, signSession, tvKey } from "@/lib/auth";
 import { asProfile, canExport, canImport, canSeePath, canWriteEntity, homeFor, type Profile } from "@/lib/permissions";
 
-const PUBLIC = ["/entrar", "/api/auth", "/api/zapsign/webhook", "/api/cron"]; // o webhook e a rotina (CRON_SECRET / master) validam o próprio acesso
+const PUBLIC = ["/entrar", "/api/auth", "/api/zapsign/webhook", "/api/cron", "/api/version"]; // o webhook e a rotina (CRON_SECRET / master) validam o próprio acesso
 const LEGACY: Record<string, Profile> = { admin: "Administrador", editor: "Analista", viewer: "Visualizador" };
 
 function apiAllowed(p: Profile, path: string, method: string): string | null {

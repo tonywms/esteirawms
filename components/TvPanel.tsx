@@ -2,6 +2,7 @@
 // V7/V8.1 · Painel de TV: tela cheia, leitura à distância, atualiza a cada 30s e alterna 3 visões a cada 20s:
 // Esteira por fases · Destravar a onda (PDFs) · Gargalos, go-lives e agenda · Mapa de gargalos (V17).
 // V32 · Logo do cliente ao lado do nome.
+// V36 · Recarrega sozinha quando sai uma versão nova do site.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, FileX2, Hand, LockKeyhole, Maximize2, Rocket, Timer, TrendingUp, Unlock, Users } from "lucide-react";
 import type { State } from "@/lib/types";
@@ -13,6 +14,7 @@ import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
+import VersionWatcher from "./VersionWatcher";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
 const empty: State = { version: 1, importedAt: "", sourceFile: "", clients: [], projects: [], tasks: [], appointments: [], staff: [], users: [], audit: [] };
@@ -50,6 +52,7 @@ export default function TvPanel() {
   const active = s.reports.filter(r => r.h.health !== "done").length;
 
   return <div className="v7-tv" onDoubleClick={() => void document.documentElement.requestFullscreen?.()}>
+    <VersionWatcher mode="tv" />
     <header className="v7-tv-head">
       <img src="/wms-expert-logo.png" alt="WMS Expert" />
       <div className="v7-tv-title"><span>ESTEIRA DE ENTREGAS · AO VIVO</span><strong>{VIEWS[view]}</strong></div>

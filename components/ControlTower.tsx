@@ -14,6 +14,7 @@ import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOw
 import TaskAttachments from "./TaskAttachments";
 import MobileNav from "./MobileNav";
 import ErrorReporter from "./ErrorReporter";
+import VersionWatcher from "./VersionWatcher"; /* WMS_ESTEIRA_V36 */
 import LinhaDoTempo from "./LinhaDoTempo";
 import { ChartGantt as GanttChartV31 } from "lucide-react"; /* WMS_ESTEIRA_V31 */
 import ClientProfile from "./ClientProfile";
@@ -390,5 +391,5 @@ export default function ControlTower(){
 
   {sidebar&&<button aria-label="Fechar menu" onClick={()=>setSidebar(false)} className="sidebar-overlay"/>}
   {modal&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null)}}><div className={`modal p6-modal p6-modal-${modal.entity}`} role="dialog" aria-modal="true" aria-labelledby="p6-modal-title"><div className="modal-head"><span className="p6-modal-icon" aria-hidden="true">{(()=>{const I=modalIcons[modal.entity];return <I size={24} strokeWidth={1.9}/>})()}</span><div className="p6-modal-heading"><span className="eyebrow">{modal.id?"EDITAR CADASTRO":"NOVO CADASTRO"}</span><h2 id="p6-modal-title">{modal.id?modalEdit[modal.entity]:modalNew[modal.entity]}</h2><p>{modalHints[modal.entity]}</p></div><button className="close-btn" aria-label="Fechar" onClick={()=>setModal(null)}><X size={18}/></button></div><div className="modal-scroll">{formError&&<div className="p6-form-error" role="alert"><AlertTriangle size={17}/><span>{formError}</span></div>}<div className="form-grid">{renderForm()}</div></div><div className="modal-foot">{modal.id&&<button type="button" className="btn ghost p6-modal-delete" disabled={saving} onClick={()=>void removeFromModal()}><Trash2 size={16}/> Excluir</button>}<button className="btn ghost" disabled={saving} onClick={()=>setModal(null)}>Cancelar</button><button className="btn primary" onClick={()=>void persist()} disabled={saving}>{saving?<RefreshCw className="spin" size={17}/>:<Check size={17}/>} {saving?"Salvando...":modal.id?"Salvar alterações":"Cadastrar"}</button></div></div></div>}
-  {toast&&<AppToast message={toast} onClose={()=>setToast("")}/>}<MobileNav onMenu={()=>setSidebar(true)}/><ErrorReporter/><PhotoHost onSaved={refresh} notify={notify}/></div>
+  {toast&&<AppToast message={toast} onClose={()=>setToast("")}/>}<MobileNav onMenu={()=>setSidebar(true)}/><ErrorReporter/><VersionWatcher/><PhotoHost onSaved={refresh} notify={notify}/></div>
 }
