@@ -4,6 +4,7 @@ import { buildSchedulePdf } from "@/lib/schedule-pdf";
 import { buildScheduleXlsx } from "@/lib/schedule-xlsx";
 import { clientDisplayName } from "@/lib/schedule";
 import { phaseOwner } from "@/lib/flow";
+import { logoBytes } from "@/lib/avatar-store"; // V32: logo do cliente no documento
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       const buf = buildScheduleXlsx(p, c, { consultant });
       return new Response(new Uint8Array(buf), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="Cronograma_${safe}.xlsx"`, "Cache-Control": "no-store" } });
     }
-    const buf = await buildSchedulePdf(p, c, { ident: url.searchParams.get("ident") !== "0", consultant });
+    const buf = await buildSchedulePdf(p, c, { ident: url.searchParams.get("ident") !== "0", consultant, logo: await logoBytes(c?.id) });
     const inline = url.searchParams.get("ver") === "1";
     return new Response(new Uint8Array(buf), { headers: { "Content-Type": "application/pdf", "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="Cronograma_${safe}.pdf"`, "Cache-Control": "no-store" } });
   } catch (e) { return problem(e instanceof Error ? e.message : "Falha ao gerar o cronograma."); }

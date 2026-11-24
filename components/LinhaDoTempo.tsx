@@ -9,6 +9,8 @@ import { todayISO } from "@/lib/metrics";
 import { PersonPhoto } from "./PersonPhoto";
 import Select from "./Select";
 import JournalDialog, { type JournalTarget } from "./JournalDialog";
+import { ClientLogo } from "./ClientLogo"; // V32
+import { logoUrl } from "@/lib/logos";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; notify: (m: string) => void; canWrite?: boolean; onOpen: (p: Project) => void };
 const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
@@ -30,6 +32,7 @@ export default function LinhaDoTempo({ data, onRefresh, notify, canWrite = true,
   const days = daysBetween(from, to);
   const groups = useMemo(() => buildTimeline(data, from, to, { mode, person: mode === "consultor" ? person || undefined : undefined, projectId: mode === "projeto" ? projectId || undefined : undefined, today }), [data, from, to, mode, person, projectId, today]);
   const people = useMemo(() => [...new Set([...data.staff.filter(s => s.active !== false).map(s => s.name), ...data.users.filter(u => u.active && u.role !== "Painel").map(u => u.name)].filter(isRealPerson))].sort((a, b) => a.localeCompare(b)), [data]);
+  const cid = (pid?: string) => pid ? data.projects.find(x => x.id === pid)?.clientId : undefined; // V32
   const projects = useMemo(() => data.projects.filter(p => !p.archivedAt).map(p => ({ id: p.id, name: data.clients.find(c => c.id === p.clientId)?.name || p.name })).sort((a, b) => a.name.localeCompare(b.name)), [data]);
   const stops = groups.flatMap(g => g.lanes.flatMap(l => l.entries.filter(e => e.status !== "ok").map(e => ({ e, l }))));
   const blockers = mode === "projeto" ? [] : [...new Map(groups.flatMap(g => g.lanes.filter(l => l.blocker).map(l => [l.projectId, l] as const))).values()];
@@ -77,21 +80,21 @@ export default function LinhaDoTempo({ data, onRefresh, notify, canWrite = true,
     </section>
 
     {(stops.length > 0 || blockers.length > 0) && <section className="v31-stops"><h3><CircleAlert size={16} /> Onde parou e por quê</h3><div>
-      {stops.map(({ e, l }) => <button key={e.id} type="button" onClick={() => canWrite && setTarget({ entry: e })}><PersonPhoto name={e.person} size={22} /><span><b>{l.client}</b><small>{brS(e.date)} · {e.person}</small><em>{e.reason || e.text}{e.blockedBy ? ` — travou por ${e.blockedBy}` : ""}</em></span><i className={`s-${e.status}`}>{STATUS_LABEL[e.status]}</i></button>)}
+      {stops.map(({ e, l }) => <button key={e.id} type="button" onClick={() => canWrite && setTarget({ entry: e })}><PersonPhoto name={e.person} size={22} /><span><b className="v32-nm"><ClientLogo clientId={cid(l.projectId)} size={18} />{l.client}</b><small>{brS(e.date)} · {e.person}</small><em>{e.reason || e.text}{e.blockedBy ? ` — travou por ${e.blockedBy}` : ""}</em></span><i className={`s-${e.status}`}>{STATUS_LABEL[e.status]}</i></button>)}
       {blockers.map(l => <button key={`b-${l.projectId}`} type="button" onClick={() => { const p = data.projects.find(x => x.id === l.projectId); if (p) onOpen(p); }}><span className="v31-bk">!</span><span><b>{l.client}</b><small>empecilho do projeto</small><em>{l.blocker}</em></span><i className="s-parado">Empecilho</i></button>)}
     </div></section>}
 
     {!groups.length && <div className="v27-panel v31-empty"><Sparkles size={22} /><b>Nada registrado neste período.</b><span>Preencha o cronograma do projeto, agende na Agenda ou clique em “Registrar dia”.</span></div>}
 
     {view === "linha" ? <div className="v31-groups" ref={scroller}>{groups.map((g, gi) => <section key={g.person} className="v27-panel v31-group" style={{ animationDelay: `${gi * 60}ms` }}>
-      <header>{mode === "consultor" ? <PersonPhoto name={g.person} size={40} /> : <span className="v31-cli">{g.person.slice(0, 1)}</span>}
+      <header>{mode === "consultor" ? <PersonPhoto name={g.person} size={40} /> : (logoUrl(cid(g.lanes[0]?.projectId)) ? <ClientLogo clientId={cid(g.lanes[0]?.projectId)} name={g.person} size={40} wide /> : <span className="v31-cli">{g.person.slice(0, 1)}</span>)}
         <div><h2>{g.person}</h2><small>{mode === "consultor" ? `${new Set(g.lanes.map(l => l.projectId)).size} cliente(s)` : `${g.lanes.length} pessoa(s) / frente(s)`} · {g.days} dia(s) com registro{g.stops.length ? ` · ${g.stops.length} parada(s)` : ""}</small></div>
         {mode === "projeto" && g.lanes[0] && <button type="button" className="v17-link" onClick={() => { const p = data.projects.find(x => x.id === g.lanes[0].projectId); if (p) onOpen(p); }}>Abrir projeto →</button>}</header>
       <div className="v31-gantt">
         <div className="v31-axis"><span className="lbl" /><div className="days" style={{ gridTemplateColumns: gridCols }}>{days.map(d => { const w = new Date(d + "T12:00:00").getDay(); return <span key={d} className={`${d === today ? "today" : ""} ${w === 0 || w === 6 ? "we" : ""} ${w === 1 ? "mon" : ""}`}><b>{WD[w]}</b>{brS(d)}</span>; })}</div></div>
         {g.lanes.map((l, li) => { const st = stack(l.segs), nRows = Math.max(1, ...st.map(x => x.row + 1));
           return <div key={l.key} className="v31-lane" style={{ animationDelay: `${gi * 60 + li * 40}ms` }}>
-            <div className="lbl">{mode === "consultor" ? <><b>{l.client}</b><small>{l.segs.filter(s => s.kind !== "crono").slice(0, 2).map(s => s.label).join(" · ") || "sem etapa no período"}</small></>
+            <div className="lbl">{mode === "consultor" ? <><b className="v32-nm"><ClientLogo clientId={cid(l.projectId)} size={18} />{l.client}</b><small>{l.segs.filter(s => s.kind !== "crono").slice(0, 2).map(s => s.label).join(" · ") || "sem etapa no período"}</small></>
               : <><span className="who">{l.person.startsWith("Cliente ·") ? <span className="v31-cli sm">C</span> : <PersonPhoto name={l.person} size={22} />}<b>{l.person.replace(/^Cliente · /, "Cliente · ")}</b></span><small>{[...new Set(l.segs.map(s => s.phase ? (s.kind === "fase" ? s.label : "") : "").filter(Boolean))].join(" · ") || `${l.segs.length} etapa(s)`}</small></>}
               {l.blocker && mode === "consultor" && <em title={l.blocker}>empecilho</em>}</div>
             <div className="track">
@@ -107,7 +110,7 @@ export default function LinhaDoTempo({ data, onRefresh, notify, canWrite = true,
       </div>
     </section>)}</div>
       : <div className="v31-list">{groups.map(g => <section key={g.person} className="v27-panel v31-lg">
-        <header>{mode === "consultor" ? <PersonPhoto name={g.person} size={34} /> : <span className="v31-cli">{g.person.slice(0, 1)}</span>}<h2>{g.person}</h2></header>
+        <header>{mode === "consultor" ? <PersonPhoto name={g.person} size={34} /> : (logoUrl(cid(g.lanes[0]?.projectId)) ? <ClientLogo clientId={cid(g.lanes[0]?.projectId)} name={g.person} size={40} wide /> : <span className="v31-cli">{g.person.slice(0, 1)}</span>)}<h2>{g.person}</h2></header>
         {g.lanes.map(l => <div key={l.key} className="v31-lcli">
           <h4>{mode === "consultor" ? `Cliente ${l.client}` : l.person}</h4>
           {l.segs.filter(s => s.kind !== "crono").map(s => <p key={s.id} className="seg"><i style={{ background: PHASE_COLOR[s.phase || "none"] }} /><b>{s.label}</b> {br(s.start)}{s.end !== s.start ? ` a ${br(s.end)}` : ""}{s.termo === "ok" ? <em className="ok"> (termo final ✓)</em> : s.termo === "pendente" ? <em className="pend"> (termo pendente)</em> : null}</p>)}

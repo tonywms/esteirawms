@@ -4,6 +4,7 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
 import type { Client, Project, ScheduleRow } from "./types";
 import { LOGO_BLUE_PNG, LOGO_BLUE_RATIO } from "./brand-logo";
+import { imageInfo } from "./image-size";
 import { GROUPS, TEAM_ROLES, brDate, clientDisplayName, clientNames, clientPeople, expertNames, fmtCnpj, fmtPhone, scheduleOf } from "./schedule";
 
 const W = 841.92, H = 595.32, L = 50, R = 792;
@@ -20,11 +21,21 @@ function spaced(page: PDFPage, f: PDFFont, t: string, x: number, y: number, size
 }
 const center = (page: PDFPage, f: PDFFont, t: string, cx: number, y: number, size: number, color: RGB, max = 200) => { const s = fit(f, t, size, max); page.drawText(s, { x: cx - f.widthOfTextAtSize(s, size) / 2, y, size, font: f, color }); };
 
-export async function buildSchedulePdf(project: Project, client: Client | undefined, opts: { ident?: boolean; consultant?: string } = {}) {
+export async function buildSchedulePdf(project: Project, client: Client | undefined, opts: { ident?: boolean; consultant?: string; logo?: Uint8Array | null } = {}) {
   const doc = await PDFDocument.create();
   const fonts: F = { r: await doc.embedFont(StandardFonts.Helvetica), b: await doc.embedFont(StandardFonts.HelveticaBold) };
   const logo = await doc.embedPng(Buffer.from(LOGO_BLUE_PNG, "base64"));
   const name = clientDisplayName(client);
+  // V32 · logo do cliente no canto direito do título da primeira página
+  const info0 = opts.logo ? imageInfo(opts.logo) : null;
+  const cLogo = info0 ? await (info0.type === "png" ? doc.embedPng(opts.logo!) : doc.embedJpg(opts.logo!)).catch(() => null) : null;
+  let logoDrawn = false;
+  const drawClientLogo = (p: PDFPage) => {
+    if (!cLogo || logoDrawn) return; logoDrawn = true;
+    const maxW = 150, maxH = 50, k = Math.min(maxW / cLogo.width, maxH / cLogo.height);
+    const w = cLogo.width * k, h = cLogo.height * k;
+    p.drawImage(cLogo, { x: R - w, y: H - 72 - (maxH + h) / 2 - 8, width: w, height: h });
+  };
   doc.setTitle(`Cronograma de implantação · ${name}`); doc.setAuthor("WMS Expert"); doc.setProducer("WMS Expert Esteira");
   const pages: PDFPage[] = [];
   const newPage = () => {
@@ -44,7 +55,7 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
 
   /* ---------- Página de identificação (opcional) ---------- */
   if (opts.ident !== false) {
-    const p = newPage(); sectionHead(p, "IDENTIFICAÇÃO DO CLIENTE", "Cliente e responsáveis");
+    const p = newPage(); sectionHead(p, "IDENTIFICAÇÃO DO CLIENTE", "Cliente e responsáveis"); drawClientLogo(p);
     const info = client?.info || {};
     const people = clientPeople(info);
     const line = (x?: { name?: string; email?: string; phone?: string; role?: string }) => x?.name ? [x.name, x.role, x.email, fmtPhone(x.phone)].filter(Boolean).join("  ·  ") : "—";
@@ -76,7 +87,7 @@ export async function buildSchedulePdf(project: Project, client: Client | undefi
   const namesOf = (r: ScheduleRow) => clientNames(r, client?.info);
   const expOf = (r: ScheduleRow) => expertNames(r, sched.team, opts.consultant).join(", ");
   const heightOf = (r: ScheduleRow) => (namesOf(r).length || expOf(r) ? 21 : 15.6);
-  let page = newPage(); sectionHead(page, "06  ·  PLANEJAMENTO", "Cronograma");
+  let page = newPage(); sectionHead(page, "06  ·  PLANEJAMENTO", "Cronograma"); drawClientLogo(page);
   let y = H - 146;
   const header = () => {
     page.drawRectangle({ x: L, y: y - 21.6, width: R - L, height: 21.6, color: C.navy });

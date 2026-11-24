@@ -1,7 +1,8 @@
 "use client";
 // V29 · Raio-X: consultores × clientes × ondas lado a lado.
+// V32 · Logos dos clientes na lista e busca em lote dos logos (pelo site de cada cliente).
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ArrowDownUp, Download, Lightbulb, ScanSearch, Users, Building2, Waves } from "lucide-react";
+import { ArrowDownUp, Download, ImagePlus, Lightbulb, ScanSearch, Users, Building2, Waves } from "lucide-react";
 import type { Project, State } from "@/lib/types";
 import type { Snap } from "@/lib/evolucao";
 import { raioX, type Trend } from "@/lib/raiox";
@@ -9,8 +10,9 @@ import { PHASES, healthLabel } from "@/lib/flow";
 import { todayISO } from "@/lib/metrics";
 import { brShort } from "@/lib/forecast";
 import { PersonPhoto } from "./PersonPhoto";
+import { ClientLogo, LogoBulk } from "./ClientLogo";
 
-type Props = { data: State; onOpen: (p: Project) => void; onNavigate: (path: string) => void };
+type Props = { data: State; onOpen: (p: Project) => void; onNavigate: (path: string) => void; onRefresh?: () => Promise<void> | void; notify?: (m: string) => void; canLogos?: boolean };
 type Tab = "consultores" | "clientes" | "ondas";
 const short = (k: string) => PHASES.find(p => p.key === k)?.short || k;
 const TrendTag = ({ t }: { t: Trend }) => !t ? <span className="v29-na">—</span> : <i className={`v27-trend ${t.d >= 3 ? "up" : t.d <= -3 ? "down" : "flat"}`} title={`${t.a} → ${t.b}`}>{t.d >= 3 ? "▲" : t.d <= -3 ? "▼" : "■"} {t.d > 0 ? `+${t.d}` : t.d}</i>;
@@ -21,7 +23,8 @@ function csv(name: string, head: string[], rows: (string | number | null)[][]) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-export default function RaioX({ data, onOpen, onNavigate }: Props) {
+export default function RaioX({ data, onOpen, onNavigate, onRefresh, notify, canLogos }: Props) {
+  const [bulk, setBulk] = useState(false);
   const [tab, setTab] = useState<Tab>("consultores"), [days, setDays] = useState(30), [snaps, setSnaps] = useState<{ today: string; rows: Snap[] } | null>(null);
   const [sort, setSort] = useState<{ k: string; d: 1 | -1 }>({ k: "", d: -1 }), [openRow, setOpenRow] = useState<string | null>(null);
   useEffect(() => { fetch("/api/evolucao?dias=95", { cache: "no-store" }).then(r => r.json()).then(j => setSnaps({ today: j.today, rows: (j.rows || []).filter((r: Snap & { est?: boolean }) => !r.est) })).catch(() => setSnaps({ today: todayISO(), rows: [] })); }, []);
@@ -42,6 +45,7 @@ export default function RaioX({ data, onOpen, onNavigate }: Props) {
   };
 
   return <div className="v27 v29-rx">
+    {bulk && <LogoBulk data={data} onClose={() => setBulk(false)} onSaved={async m => { await onRefresh?.(); notify?.(m); }} />}
     <div className="page-header v4-page-header"><div className="v4-heading-copy">
       <div className="eyebrow"><span className="v4-live-dot" /> WMS EXPERT  /  RAIO-X</div>
       <h1>Raio-X da carteira</h1>
@@ -49,6 +53,7 @@ export default function RaioX({ data, onOpen, onNavigate }: Props) {
     </div>
       <div className="v29-rx-ctrl">
         <div className="seg">{[7, 30, 90].map(d => <button key={d} type="button" className={days === d ? "on" : ""} onClick={() => setDays(d)}>{d} dias</button>)}</div>
+        {canLogos && <button type="button" className="btn outline small v29-exp" onClick={() => setBulk(true)} title="Buscar o logo no site de cada cliente"><ImagePlus size={14} /> Logos dos clientes</button>}
         <button type="button" className="btn outline small v29-exp" onClick={exportTab}><Download size={14} /> Exportar CSV</button>
       </div>
     </div>
@@ -75,7 +80,7 @@ export default function RaioX({ data, onOpen, onNavigate }: Props) {
     {tab === "clientes" && <section className="v27-panel"><div className="v29-tw"><table className="v29-rt">
       <thead><tr><th>Cliente</th><th>Fase · dono</th><Th k="risk">Risco</Th><Th k="age">Dias de projeto</Th><Th k="idle">Parado</Th><Th k="diff">Previsto × prometido</Th><Th k="ball" title={`% do tempo com a bola fora da WMS Expert nos últimos ${days} dias`}>Bola fora</Th><Th k="rw">Voltas</Th><Th k="infra">Infra</Th><Th k="docs">Docs</Th><Th k="late">Vencidas</Th><Th k="vis">Visitas</Th></tr></thead>
       <tbody>{sorted(rx.clients, { risk: c => c.risk, age: c => c.ageBD, idle: c => c.idle, diff: c => c.diff, ball: c => c.ballOut, rw: c => c.rework, infra: c => c.infra, docs: c => c.docsMissing, late: c => c.late, vis: c => c.visits }).map((c, i) => <tr key={c.p.id} className={!sort.k && i < 5 ? "top5" : ""} onClick={() => onOpen(c.p)}>
-        <td><b>{c.name}</b><small className="why">{c.why.join(" · ") || "sem alertas"}</small></td>
+        <td><span className="v32-nm"><ClientLogo clientId={c.p.clientId} name={c.name} size={22} /><b>{c.name}</b></span><small className="why">{c.why.join(" · ") || "sem alertas"}</small></td>
         <td><small>{short(c.phase)} · {c.wave}</small><span className="own"><PersonPhoto name={c.owner} size={16} />{c.owner}</span></td>
         <td className="risk"><span className={`rk ${c.risk >= 60 ? "bad" : c.risk >= 30 ? "warn" : "good"}`}>{c.risk}</span></td>
         <td className="n">{c.ageBD ?? "—"}</td><td className={`n ${tone(c.idle, 3, 7, true)}`}>{c.idle ?? "—"}d</td>

@@ -6,6 +6,7 @@ import type { Client, Project, ScheduleRow } from "./types";
 import { ESCOPO_DOCX } from "./templates/escopo-docx";
 import { unzip } from "./unzip";
 import { zip } from "./xlsx";
+import { imageInfo } from "./image-size";
 import { GROUPS, brDate, clientDisplayName, clientNames, expertNames, scheduleOf } from "./schedule";
 
 const esc = (s: string) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -65,7 +66,14 @@ function buildSchedule(tbl: string, rows: ScheduleRow[], name: (r: ScheduleRow) 
   return tbl.slice(0, start) + out.join("") + tbl.slice(end);
 }
 
-export function buildEscopoDocx(project: Project, client: Client | undefined, opts: { consultant?: string } = {}) {
+/** V32 · Caixa branca com o logo do cliente, para a capa (fundo escuro). */
+function logoBlock(cx: number, cy: number) {
+  const wTw = Math.round(cx / 635) + 400, none = ["top", "left", "bottom", "right", "insideH", "insideV"].map(k => `<w:${k} w:val="nil"/>`).join("");
+  const run = `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="9301" name="Logo do cliente"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="9301" name="logo-cliente"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdLogoCliente"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>`;
+  return `<w:tbl><w:tblPr><w:tblW w:w="${wTw}" w:type="dxa"/><w:tblBorders>${none}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="120" w:type="dxa"/><w:left w:w="200" w:type="dxa"/><w:bottom w:w="120" w:type="dxa"/><w:right w:w="200" w:type="dxa"/></w:tblCellMar><w:tblLook w:val="0000"/></w:tblPr><w:tblGrid><w:gridCol w:w="${wTw}"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="${wTw}" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/><w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>${run}</w:p></w:tc></w:tr></w:tbl><w:p><w:pPr><w:spacing w:before="0" w:after="160" w:line="240" w:lineRule="auto"/></w:pPr></w:p>`;
+}
+
+export function buildEscopoDocx(project: Project, client: Client | undefined, opts: { consultant?: string; logo?: Uint8Array | null } = {}) {
   const files = unzip(Buffer.from(ESCOPO_DOCX, "base64"));
   const name = clientDisplayName(client), info = client?.info || {};
   const sched = scheduleOf(project.schedule), team = sched.team || {};
@@ -107,9 +115,48 @@ export function buildEscopoDocx(project: Project, client: Client | undefined, op
         return tbl;
       });
     }
+    if (f.name === "word/document.xml") {
+      // V32 · logo do cliente na capa e capa sempre numa página só (nomes longos quebram em 2 linhas)
+      let need = Math.max(0, Math.ceil(name.length / 19) - 1) * 900;
+      if (opts.logo) { const r = addCoverLogo(x, opts.logo, name, files); x = r.xml; need += r.tw; }
+      x = fitCover(x, need);
+    }
     f.data = Buffer.from(x, "utf8");
   }
   const core = files.find(f => f.name === "docProps/core.xml");
   if (core) core.data = Buffer.from(core.data.toString("utf8").replace(/<dc:title>[^<]*<\/dc:title>/, `<dc:title>Escopo de implantação · ${esc(name)}</dc:title>`), "utf8");
   return zip(files.map(f => ({ name: f.name, data: f.data })));
+}
+
+/** V32 · Coloca o logo do cliente na capa, logo abaixo do nome do cliente, sem empurrar a capa para a página seguinte. */
+function addCoverLogo(x: string, logo: Uint8Array, name: string, files: { name: string; data: Buffer }[]) {
+  const none = { xml: x, tw: 0 };
+  const info = imageInfo(logo); if (!info || !info.w || !info.h) return none;
+  const firstTbl = x.indexOf("<w:tbl>"); if (firstTbl < 0) return none;
+  const cover = x.slice(0, firstTbl);
+  const paras = [...cover.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)];
+  const target = paras.find(m => textOf(m[0]).trim() === name.trim()) || paras.find(m => textOf(m[0]).includes("Formato de equipes"));
+  if (!target || target.index === undefined) return none;
+  const EMU = 914400, k = Math.min((2.4 * EMU) / info.w, (0.62 * EMU) / info.h);
+  const cx = Math.round(info.w * k), cy = Math.round(info.h * k);
+  const atEnd = textOf(target[0]).includes("Formato de equipes") ? target.index : target.index + target[0].length;
+  const out = x.slice(0, atEnd) + logoBlock(cx, cy) + x.slice(atEnd);
+  const blockTw = Math.round(cy / 635) + 240 + 160 + 80;
+  const ext = info.type === "png" ? "png" : "jpeg";
+  files.push({ name: `word/media/logo-cliente.${ext}`, data: Buffer.from(logo) });
+  const rels = files.find(f => f.name === "word/_rels/document.xml.rels");
+  if (rels) rels.data = Buffer.from(rels.data.toString("utf8").replace("</Relationships>", `<Relationship Id="rIdLogoCliente" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo-cliente.${ext}"/></Relationships>`), "utf8");
+  const ct = files.find(f => f.name === "[Content_Types].xml");
+  if (ct && ext === "jpeg" && !/Extension="jpeg"/i.test(ct.data.toString("utf8"))) ct.data = Buffer.from(ct.data.toString("utf8").replace("<Default Extension=\"rels\"", "<Default Extension=\"jpeg\" ContentType=\"image/jpeg\"/><Default Extension=\"rels\""), "utf8");
+  return { xml: out, tw: blockTw };
+}
+
+/** Tira o espaço que falta dos brancos da capa (topo e acima do rodapé da capa), para nada ir para a página 2. */
+function fitCover(x: string, need: number) {
+  if (need <= 0) return x;
+  const firstTbl = x.indexOf("<w:tbl>"); if (firstTbl < 0) return x;
+  let cover = x.slice(0, firstTbl);
+  cover = cover.replace(/<w:spacing w:before="(\d+)"/, (m, v) => { const cut = Math.min(need, Math.max(0, Number(v) - 1000)); need -= cut; return `<w:spacing w:before="${Number(v) - cut}"`; });
+  if (need > 0) cover = cover.replace(/w:after="3000"/, () => { const cut = Math.min(need, 2500); need -= cut; return `w:after="${3000 - cut}"`; });
+  return cover + x.slice(firstTbl);
 }

@@ -9,6 +9,7 @@ import { isDone, todayISO } from "@/lib/metrics";
 import { forecastAll, br, brShort } from "@/lib/forecast";
 import { PersonPhoto } from "./PersonPhoto";
 import Select from "./Select";
+import { ClientLogo } from "./ClientLogo"; // V32
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onOpen: (p: Project) => void; onNavigate: (path: string) => void };
 type Me = { name: string; email?: string; profile?: string | null; role?: string | null };
@@ -113,15 +114,15 @@ export default function MinhaSemana({ data, onRefresh, onOpen, onNavigate }: Pro
       <section className="v27-panel">
         <header><h2><Target size={17} /> Próximas ações</h2><small>O que você combinou de fazer para os projetos andarem</small></header>
         {actions.map(p => { const lateA = p.nextActionDue && p.nextActionDue < today; return <button key={p.id} type="button" className={`v27-action ${lateA ? "late" : ""}`} onClick={() => onOpen(p)}>
-          <b>{clientOf(p.clientId)}</b><span>{p.nextAction}</span><small>{p.nextActionDue ? (lateA ? `venceu ${br(p.nextActionDue)}` : `até ${br(p.nextActionDue)}`) : "sem prazo"}</small></button>; })}
-        {missing.map(p => <button key={p.id} type="button" className="v27-action missing" onClick={() => onOpen(p)}><b>{clientOf(p.clientId)}</b><span>Sem próxima ação — você é dono da fase</span><small>definir</small></button>)}
+          <b className="v32-nm"><ClientLogo clientId={p.clientId} size={18} />{clientOf(p.clientId)}</b><span>{p.nextAction}</span><small>{p.nextActionDue ? (lateA ? `venceu ${br(p.nextActionDue)}` : `até ${br(p.nextActionDue)}`) : "sem prazo"}</small></button>; })}
+        {missing.map(p => <button key={p.id} type="button" className="v27-action missing" onClick={() => onOpen(p)}><b className="v32-nm"><ClientLogo clientId={p.clientId} size={18} />{clientOf(p.clientId)}</b><span>Sem próxima ação — você é dono da fase</span><small>definir</small></button>)}
         {!actions.length && !missing.length && <div className="v7-empty"><CheckCircle2 /> Nada pendente</div>}
       </section>
 
       <section className="v27-panel">
         <header><h2><Flag size={17} /> Projetos em que você é dono da fase</h2><small>{owned.length} projeto(s)</small></header>
         <div className="v27-owned">{owned.map(p => { const h = healthOf(p, today, data.tasks), f = fc.get(p.id); return <button key={p.id} type="button" className={`v27-proj h-${h.health}`} onClick={() => onOpen(p)}>
-          <span className="top"><b>{clientOf(p.clientId)}</b><i className={`dot h-${h.health}`} title={healthLabel[h.health]} /></span>
+          <span className="top"><b className="v32-nm"><ClientLogo clientId={p.clientId} size={18} />{clientOf(p.clientId)}</b><i className={`dot h-${h.health}`} title={healthLabel[h.health]} /></span>
           <small>{PHASES.find(x => x.key === phaseOf(p))?.short} · {h.inPhase ?? "–"} dias na fase</small>
           {f && <small className={`fc s-${f.status}`}><Rocket size={11} /> {f.status === "virou" ? `virou ${brShort(f.forecast)}` : `go-live previsto ${brShort(f.forecast)}`}{f.promised && f.status !== "virou" ? ` · prometido ${brShort(f.promised)}` : ""}</small>}
           {h.health !== "green" && h.reasons[0] && <em>{h.reasons[0]}</em>}

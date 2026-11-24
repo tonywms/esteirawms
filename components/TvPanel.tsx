@@ -1,12 +1,15 @@
 "use client";
 // V7/V8.1 · Painel de TV: tela cheia, leitura à distância, atualiza a cada 30s e alterna 3 visões a cada 20s:
 // Esteira por fases · Destravar a onda (PDFs) · Gargalos, go-lives e agenda · Mapa de gargalos (V17).
+// V32 · Logo do cliente ao lado do nome.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarClock, CheckCircle2, FileClock, FileX2, Hand, LockKeyhole, Maximize2, Rocket, Timer, TrendingUp, Unlock, Users } from "lucide-react";
 import type { State } from "@/lib/types";
 import { PHASES, ballOf, docStates, flowSummary, phaseIndex, phaseOwner, unlockSummary, type Health } from "@/lib/flow";
 import { fmtDate, todayISO } from "@/lib/metrics";
 import { avatarUrl, registerAvatars } from "@/lib/avatars";
+import { registerLogos } from "@/lib/logos";
+import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 import { DIMS, attackFirst, gargalosSummary, heatmap } from "@/lib/gargalos";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
@@ -21,7 +24,7 @@ export default function TvPanel() {
   const [data, setData] = useState<State>(empty), [updated, setUpdated] = useState<Date | null>(null), [err, setErr] = useState("");
   const [view, setView] = useState(0), [now, setNow] = useState(() => new Date());
   const load = useCallback(async () => {
-    try { const r = await fetch("/api/state", { cache: "no-store" }); if (!r.ok) throw new Error(r.status === 401 ? "Link da TV expirado: abra novamente o link com a chave." : "Falha ao carregar"); const j = await r.json(); registerAvatars(j.avatars); setData(j); setUpdated(new Date()); setErr(""); }
+    try { const r = await fetch("/api/state", { cache: "no-store" }); if (!r.ok) throw new Error(r.status === 401 ? "Link da TV expirado: abra novamente o link com a chave." : "Falha ao carregar"); const j = await r.json(); registerAvatars(j.avatars); registerLogos(j.logos, j.clients); setData(j); setUpdated(new Date()); setErr(""); }
     catch (e) { setErr(e instanceof Error ? e.message : "Sem conexão"); }
   }, []);
   useEffect(() => { void load(); const a = setInterval(() => void load(), REFRESH_MS), b = setInterval(() => setView(v => (v + 1) % N), ROTATE_MS), c = setInterval(() => setNow(new Date()), 1000); return () => { clearInterval(a); clearInterval(b); clearInterval(c); }; }, [load]);
@@ -67,7 +70,7 @@ export default function TvPanel() {
       {s.byPhase.filter(ph => ph.key !== "fim").map((ph, i) => <div key={ph.key} className="col">
         <header><span>{i + 1}</span><strong>{ph.short}</strong><em>{ph.items.length}</em></header>
         <div className="list">{[...ph.items].sort((a, b) => order[a.h.health] - order[b.h.health]).slice(0, 8).map(({ p, h }) =>
-          <div key={p.id} className={`c ${h.health}`}><strong>{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d</small>{h.health !== "done" && (docStates(p).some(d => d.state === "pending" || d.state === "missing") ? <em className="pdf" title="Documento pendente"><FileX2 />PDF</em> : docStates(p).some(d => d.state === "sent") ? <em className="pdf sent" title="Aguardando assinatura do cliente"><FileClock />ASSIN.</em> : null)}</div>)}
+          <div key={p.id} className={`c ${h.health}`}><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d</small>{h.health !== "done" && (docStates(p).some(d => d.state === "pending" || d.state === "missing") ? <em className="pdf" title="Documento pendente"><FileX2 />PDF</em> : docStates(p).some(d => d.state === "sent") ? <em className="pdf sent" title="Aguardando assinatura do cliente"><FileClock />ASSIN.</em> : null)}</div>)}
           {ph.items.length > 8 && <div className="more">+{ph.items.length - 8} projetos</div>}
         </div>
       </div>)}
@@ -79,13 +82,13 @@ export default function TvPanel() {
       <div className="v8-unlock-grid">
         <div className="panel-tv">
           <h3><Unlock /> Prontos para avançar <em>{u.ready.length}</em></h3>
-          <div className="rows">{u.ready.slice(0, 6).map(({ p, from, to }) => <div key={p.id} className="row ready"><i /><div><strong>{name(p.clientId)}</strong><small>{PHASES[phaseIndex(from)].short} <ArrowRight size={12} /> {from === "homolog" ? "Implantação / Go-live" : PHASES[phaseIndex(to)].short}</small></div><span className="ball">{phaseOwner(p)}</span></div>)}
+          <div className="rows">{u.ready.slice(0, 6).map(({ p, from, to }) => <div key={p.id} className="row ready"><i /><div><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{PHASES[phaseIndex(from)].short} <ArrowRight size={12} /> {from === "homolog" ? "Implantação / Go-live" : PHASES[phaseIndex(to)].short}</small></div><span className="ball">{phaseOwner(p)}</span></div>)}
             {u.ready.length > 6 && <div className="more">+{u.ready.length - 6} projetos</div>}
             {!u.ready.length && <div className="muted">Nenhum card com PDF OK parado na fase</div>}</div>
         </div>
         <div className="panel-tv">
           <h3><FileX2 /> Falta PDF para avançar <em>{u.blocked.length}</em></h3>
-          <div className="rows">{u.blocked.slice(0, 6).map(g => <div key={g.p.id + g.key} className={`row ${g.state === "sent" ? "sent" : "red"}`}><i /><div><strong>{name(g.p.clientId)}</strong><small>{g.state === "sent" ? <FileClock size={13} /> : <FileX2 size={13} />} {g.doc}</small></div><span className="ball">{g.state === "sent" ? "Assinatura do cliente" : g.owner}</span><span className="days"><Timer size={15} />{g.days}d</span></div>)}
+          <div className="rows">{u.blocked.slice(0, 6).map(g => <div key={g.p.id + g.key} className={`row ${g.state === "sent" ? "sent" : "red"}`}><i /><div><strong className="v32-nm"><ClientLogo clientId={g.p.clientId} size={28} />{name(g.p.clientId)}</strong><small>{g.state === "sent" ? <FileClock size={13} /> : <FileX2 size={13} />} {g.doc}</small></div><span className="ball">{g.state === "sent" ? "Assinatura do cliente" : g.owner}</span><span className="days"><Timer size={15} />{g.days}d</span></div>)}
             {u.blocked.length > 6 && <div className="more">+{u.blocked.length - 6} projetos · os mais antigos aparecem primeiro</div>}
             {!u.blocked.length && <div className="ok"><CheckCircle2 /> Todas as fases atuais com PDF</div>}</div>
         </div>
@@ -117,7 +120,7 @@ export default function TvPanel() {
         <h3><AlertTriangle /> Gargalos e empecilhos <em>{s.critical.length + s.attention.length}</em></h3>
         <div className="rows">{[...s.critical, ...s.attention].slice(0, 7).map(({ p, h }) => <div key={p.id} className={`row ${h.health}`}>
           <i />
-          <div><strong>{name(p.clientId)}</strong><small>{h.reasons[0] || ""}</small></div>
+          <div><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{h.reasons[0] || ""}</small></div>
           <span className="ball"><Hand size={15} />{ballOf(p)}</span>
           <span className="days"><Timer size={15} />{h.idle ?? 0}d</span>
         </div>)}
@@ -127,7 +130,7 @@ export default function TvPanel() {
       <div className="stack">
         {s.goLives.length > 0 && <div className="panel-tv">
           <h3><Rocket /> Go-lives próximos 7 dias <em>{s.goLives.length}</em></h3>
-          <div className="rows">{s.goLives.slice(0, 4).map(({ p }) => <div key={p.id} className="row golive"><i /><div><strong>{name(p.clientId)}</strong><small>{phaseOwner(p)}</small></div><span className="date">{fmtDate(p.goLiveDate)}</span></div>)}
+          <div className="rows">{s.goLives.slice(0, 4).map(({ p }) => <div key={p.id} className="row golive"><i /><div><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{phaseOwner(p)}</small></div><span className="date">{fmtDate(p.goLiveDate)}</span></div>)}
 </div>
         </div>}
         <div className="panel-tv">
@@ -159,7 +162,7 @@ function TvTimeline({ data }: { data: State }) {
       {days.map(d => { const items = g.lanes.flatMap(l => { const e = l.entries.filter(x => x.date === d); const sg = l.segs.find(x => x.kind !== "crono" && x.start <= d && x.end >= d); const ap = l.apps.find(a => a.date === d);
           return e.length || sg || ap ? [{ l, e, sg, ap }] : []; });
         return <div key={d} className={`cell ${d === today ? "today" : ""} ${d > today ? "fut" : ""}`}>{items.slice(0, 2).map(({ l, e, sg, ap }) => <div key={l.key} className={`it ${e.some(x => x.status === "parado") ? "stop" : e.some(x => x.status === "parcial") ? "part" : ""}`} style={{ borderColor: PHASE_COLOR[sg?.phase || "none"] }}>
-          <b>{l.client}</b><small>{e[0] ? e[0].text : sg ? sg.label : ap?.title}</small>{e.find(x => x.status !== "ok")?.reason && <em>⛔ {e.find(x => x.status !== "ok")?.reason}</em>}</div>)}
+          <b className="v32-nm"><ClientLogo clientId={data.projects.find(x => x.id === l.projectId)?.clientId} size={20} />{l.client}</b><small>{e[0] ? e[0].text : sg ? sg.label : ap?.title}</small>{e.find(x => x.status !== "ok")?.reason && <em>⛔ {e.find(x => x.status !== "ok")?.reason}</em>}</div>)}
           {items.length > 2 && <i>+{items.length - 2}</i>}</div>; })}
     </div>)}{!groups.length && <div className="v31-tv-empty">Nenhuma agenda, etapa ou registro nesta semana.</div>}</div>
   </section>;

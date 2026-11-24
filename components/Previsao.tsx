@@ -8,6 +8,7 @@ import { PHASES } from "@/lib/flow";
 import { todayISO } from "@/lib/metrics";
 import { PersonPhoto } from "./PersonPhoto";
 import ConfirmDialog, { type ConfirmBox } from "./ConfirmDialog";
+import { ClientLogo } from "./ClientLogo"; // V32
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onOpen: (p: Project) => void };
 type Filter = "todos" | "30" | "risco" | "sem-data" | "virou";
@@ -80,7 +81,7 @@ export default function Previsao({ data, onRefresh, onOpen }: Props) {
           let cur = today;
           const segs = f.steps.map(s => { const a = cur; cur = addBD(cur, s.days); return { ...s, a, b: cur }; });
           return <div key={f.p.id} className={`v27-row s-${f.status}`}>
-            <button type="button" className="lbl" onClick={() => onOpen(f.p)} title="Abrir o projeto"><b>{f.client}</b><small><PersonPhoto name={f.owner} size={16} />{short(f.phase)} · {f.owner}</small></button>
+            <button type="button" className="lbl" onClick={() => onOpen(f.p)} title="Abrir o projeto"><b className="v32-nm"><ClientLogo clientId={f.p.clientId} size={18} />{f.client}</b><small><PersonPhoto name={f.owner} size={16} />{short(f.phase)} · {f.owner}</small></button>
             <div className="track" title={f.reason}>
               {ticks.filter(t => t.month).map(t => <i key={t.d} className="grid" style={{ left: x(t.d) }} />)}
               {f.status === "virou" ? <span className="done-flag" style={{ left: 0 }}><CheckCircle2 size={13} /> virou {brShort(f.forecast)}</span>

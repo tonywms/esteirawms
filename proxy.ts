@@ -16,6 +16,7 @@ function apiAllowed(p: Profile, path: string, method: string): string | null {
   if (path.startsWith("/api/zapsign/send") || path.startsWith("/api/zapsign/sync")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode enviar documentos para assinatura.`;
   if (path.startsWith("/api/tasks/attachments")) return p === "Painel" ? "Perfil Painel: somente a TV." : canWriteEntity(p, "tasks", "PATCH") ? null : `Seu perfil (${p}) não pode anexar arquivos.`;
   if (path.startsWith("/api/flow/override") || path.startsWith("/api/escalate") || path.startsWith("/api/report")) return canWriteEntity(p, "projects", "PATCH") ? null : `Seu perfil (${p}) não pode executar esta ação.`;
+  if (path.startsWith("/api/logo/buscar") || path.startsWith("/api/logo/imagem") || (path === "/api/logo" && !read)) return canWriteEntity(p, "clients", "PATCH") ? null : `Seu perfil (${p}) não pode trocar o logo dos clientes.`; // V32
   if (read) return null;
   const m = path.match(/^\/api\/records\/([^/]+)/);
   if (m) return canWriteEntity(p, m[1], method) ? null : p === "Visualizador" ? "Seu perfil (Visualizador) permite apenas consulta." : `Seu perfil (${p}) não tem permissão para esta alteração.`;
@@ -46,7 +47,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(login);
   }
   if (s.r === "tv") {
-    const ok = req.method === "GET" && (pathname === "/tv" || pathname === "/api/state" || pathname === "/api/evolucao" || pathname.startsWith("/api/avatar/"));
+    const ok = req.method === "GET" && (pathname === "/tv" || pathname === "/api/state" || pathname === "/api/evolucao" || pathname.startsWith("/api/avatar/") || /^\/api\/logo\/logo-[a-z0-9-]+$/.test(pathname));
     if (ok) return NextResponse.next();
     return isApi ? NextResponse.json({ error: "Link da TV: somente leitura." }, { status: 403 }) : NextResponse.redirect(new URL("/tv", req.url));
   }

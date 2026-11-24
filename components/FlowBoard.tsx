@@ -1,4 +1,5 @@
 "use client";
+
 // V7 · Esteira por ondas: linhas = ondas, colunas = fases (começo → meio → fim).
 // Cada cartão mostra semáforo, dono da fase, dias na fase, com quem está a bola e a próxima ação.
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +25,7 @@ import { fmtDate, initials, todayISO } from "@/lib/metrics";
 import { avatarUrl } from "@/lib/avatars";
 import { PersonPhoto } from "./PersonPhoto";
 import Select from "./Select";
+import { ClientLogo } from "./ClientLogo"; // V32
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onEdit: (p: Project) => void; onOpen: (p: Project) => void };
 const clientName = (s: State, id: string) => s.clients.find(c => c.id === id)?.name || "Cliente";
@@ -114,7 +116,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
     {PHASES.map(ph => <div key={ph.key} className={`v7-cell ${ph.key === "fim" ? "done" : ""}`}>
       {rows.filter(r => r.phase === ph.key).sort((a, b) => ({ red: 0, amber: 1, green: 2, done: 3 }[a.h.health] - { red: 0, amber: 1, green: 2, done: 3 }[b.h.health])).map(({ p, h }) =>
         <button key={p.id} className={`v7-card v7-${h.health}`} onClick={() => onPick(p.id)} title={h.reasons.join(" · ")}>
-          <div className="v7-card-top"><strong>{clientName(data, p.clientId)}</strong><Dot h={h.health} /></div>
+          <div className="v7-card-top"><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={20} />{clientName(data, p.clientId)}</strong><Dot h={h.health} /></div>
           <div className="v7-card-owner">{avatarUrl(phaseOwner(p)) ? <PersonPhoto name={phaseOwner(p)} size={22} className="v7-av-photo" /> : <span className="v7-av">{initials(phaseOwner(p))}</span>}{phaseOwner(p)}</div>
           <div className="v7-card-meta">
             <span title="Dias na fase"><Timer size={12} />{h.inPhase ?? "–"}d</span>
@@ -243,7 +245,7 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
   return createPortal(<div className="v7-drawer-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
     <aside className="v7-drawer" role="dialog" aria-modal="true" aria-label={`Projeto ${clientName(data, p.clientId)}`}>
       <header className={`v7-drawer-head v7-${h.health}`}>
-        <div><span className="v7-drawer-eyebrow">{p.wave || "Sem onda"} · {p.system}</span><h2>{clientName(data, p.clientId)}</h2>
+        <div><span className="v7-drawer-eyebrow">{p.wave || "Sem onda"} · {p.system}</span><h2 className="v32-nm"><ClientLogo clientId={p.clientId} size={30} wide />{clientName(data, p.clientId)}</h2>
           <div className="v7-drawer-tags"><span className={`v7-health-pill v7-${h.health}`}><Dot h={h.health} />{healthLabel[h.health]}</span><span className="v7-ghost-pill"><Timer size={13} />{h.inPhase ?? "–"} dias na fase</span><span className="v7-ghost-pill"><Clock3 size={13} />{h.idle ?? "–"} dias sem movimento</span>{(() => { const f = forecastOf(data, p); return f ? <span className={`v7-ghost-pill v27-pill s-${f.status}`} title={f.reason}><RocketV27 size={13} />{f.status === "virou" ? `Virou ${br(f.forecast)}` : `Go-live previsto ${br(f.forecast)}${f.promised ? ` · prometido ${br(f.promised)}` : ""}`}</span> : null; })()}</div></div>
         <button className="v7-x" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
       </header>
