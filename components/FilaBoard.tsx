@@ -59,5 +59,5 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
 }
 
 export function FilaLegend() {
-  return <div className="v40-legend"><span className="k homolog">HOMOLOG.</span><span className="k golive">GO-LIVE</span><span className="k campo">IMPLANT.</span><span className="k treino">TREINO</span><span className="k dev">INTEGR.</span><span className="k office">ESCRIT.</span><span className="s st-pre">listrado = pré-agendado</span><span className="s ag">com borda = só na agenda</span></div>;
+  return <div className="v40-legend"><span className="k homolog">HOMOLOG.</span><span className="k golive">GO-LIVE</span><span className="k campo">IMPLANT.</span><span className="k treino">TREINO</span><span className="k dev">INTEGR.</span><span className="k office">ESCRIT.</span><span className="s st-pre">claro + PRÉ = pré-agendado</span></div>;
 }

@@ -128,7 +128,7 @@ export function agendaBars(st: State, days: string[], people: string[], skipIds:
   for (const person of people) {
     const apps = st.appointments.filter(a => a.consultant === person && a.date && set.has(a.date) && a.status !== "Cancelado" && !skipIds.has(a.id)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
     for (const a of apps) {
-      const prev = out.find(b => b.person === person && b.clientId === a.clientId && b.title === a.title && days.indexOf(b.end) === days.indexOf(a.date!) - 1);
+      const prev = out.find(b => b.person === person && b.clientId === a.clientId && (b.title === a.title || b.office) && days.indexOf(b.end) === days.indexOf(a.date!) - 1); // escritório: dias seguidos viram uma barra só
       if (prev) { prev.end = a.date!; prev.appointments.push(a); continue; }
       if (out.some(b => b.person === person && b.clientId === a.clientId && b.title === a.title && b.start <= a.date! && b.end >= a.date!)) continue;
       const pr = st.projects.find(p => p.id === a.projectId), office = (!!pr && isInternalProject(pr)) || a.projectId === INTERNAL_PROJECT_ID || !!internalName(a.clientId);
