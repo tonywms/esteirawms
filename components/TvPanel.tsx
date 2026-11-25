@@ -49,10 +49,10 @@ export default function TvPanel() {
   const pulse = useMemo(() => tvPulse(data), [data]);
   const risks = useMemo(() => tvRisks(data), [data]);
   const fila = useMemo(() => { // V40: esta semana e a próxima, por dia
-    // V41: quantas semanas mostrar (1, 2 ou 3) vem da configuração do painel; ?semanas=N na URL sobrepõe nesta TV
+    // V41: quantas semanas mostrar (1 a 4) vem da configuração do painel; ?semanas=N na URL sobrepõe nesta TV
     const qs = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("semanas")) : 0;
     const cfgW = Number((data as State & { config?: { tvWeeks?: number } }).config?.tvWeeks) || 2;
-    const wk = [1, 2, 3].includes(qs) ? qs : [1, 2, 3].includes(cfgW) ? cfgW : 2;
+    const wk = [1, 2, 3, 4].includes(qs) ? qs : [1, 2, 3, 4].includes(cfgW) ? cfgW : 2;
     const today = todayISO(), plan = planQueue(data, today, addDaysISO(today, 400)), days = weekDays(mondayOf(today), wk);
     const { placed, queue } = splitPlan(plan.all);
     const people = panelPeople(data, placed, days);

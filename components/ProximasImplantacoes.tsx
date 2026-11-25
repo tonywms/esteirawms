@@ -72,7 +72,7 @@ export default function ProximasImplantacoes({ data, onRefresh, notify, canWrite
     <div className="v42-tvcard">
       <span className="ic"><Tv size={20} /></span>
       <span className="tx"><b>Painel da TV</b><small>Quantas semanas a TV mostra em “Próximas implantações”{canPeople ? "" : " · só Administrador e Gestor alteram"}</small></span>
-      <div className="opts" role="group" aria-label="Semanas na TV">{[1, 2, 3].map(w => <button key={w} type="button" className={tvWeeks === w ? "on" : ""} disabled={!canPeople} onClick={() => void setTvWeeks(w)}>{w === 1 ? "1 semana" : `${w} semanas`}</button>)}</div>
+      <div className="opts" role="group" aria-label="Semanas na TV">{[1, 2, 3, 4].map(w => <button key={w} type="button" className={tvWeeks === w ? "on" : ""} disabled={!canPeople} onClick={() => void setTvWeeks(w)}>{w === 1 ? "1 semana" : `${w} semanas`}</button>)}</div>
       <a href="/tv" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir a TV</a>
     </div>
     <div className="v40-bar">
