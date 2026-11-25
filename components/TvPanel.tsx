@@ -17,7 +17,7 @@ import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 import { attackFirst, heatmap } from "@/lib/gargalos";
 import { tvPulse, tvRisks } from "@/lib/tv-pulse";
-import { addDaysISO, agendaBars, panelPeople, planQueue, weekDays, TBD } from "@/lib/fila";
+import { addDaysISO, agendaBars, panelPeople, planQueue, splitPlan, weekDays } from "@/lib/fila";
 import { FilaCalendar, FilaLegend } from "./FilaBoard";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
 import VersionWatcher from "./VersionWatcher";
@@ -50,10 +50,9 @@ export default function TvPanel() {
   const risks = useMemo(() => tvRisks(data), [data]);
   const fila = useMemo(() => { // V40: esta semana e a próxima, por dia
     const today = todayISO(), plan = planQueue(data, today, addDaysISO(today, 400)), days = weekDays(mondayOf(today), 2);
-    const placed = plan.all.filter(x => x.status !== "sugerido" && x.consultant !== TBD);
+    const { placed, queue } = splitPlan(plan.all);
     const people = panelPeople(data, placed, days);
     const skip = new Set(data.appointments.filter(a => placed.some(x => x.p.id === a.projectId && x.consultant === a.consultant && a.date && a.date >= x.start && a.date <= x.end)).map(a => a.id));
-    const queue = plan.all.filter(x => x.status === "sugerido" || x.consultant === TBD);
     return { days, placed, people, agenda: agendaBars(data, days, people, skip), queue, today };
   }, [data]);
   const name = (id: string) => data.clients.find(c => c.id === id)?.name || "Cliente";

@@ -2281,3 +2281,8 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v40-tvq .q em { font-style: normal; font-weight: 900; font-size: clamp(9px, 1.2vh, 16px); color: #fff; width: 2.2vh; height: 2.2vh; display: grid; place-items: center; border-radius: 6px; background: #0284c7; } .v40-tvq .q.golive em { background: #7c3aed; }
 .v40-tvq .q b { font-size: clamp(11px, 1.6vh, 22px); color: #e3f1f8; } .v40-tvq .q small { font-size: clamp(10px, 1.3vh, 17px); color: #93b3c8; }
 .v40-tvq .more { color: #9fdcec; font-weight: 800; font-size: clamp(11px, 1.5vh, 20px); }
+.v40-row .bar.clash { outline: 3px solid #ef4444; outline-offset: 1px; animation: v40-clash 1.6s ease-in-out infinite; }
+.v40-row .bar.clash::before { content: "⚠ conflito"; position: absolute; right: 22px; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 900; background: #ef4444; color: #fff; border-radius: 99px; padding: 2px 7px; }
+@keyframes v40-clash { 0%, 100% { outline-color: #ef4444; } 50% { outline-color: rgba(239, 68, 68, .35); } }
+.v40-queue .q .st { font-style: normal; font-size: 10.5px; font-weight: 800; border-radius: 99px; padding: 1px 8px; width: fit-content; margin-top: 2px; }
+.v40-queue .q .st.st-andamento { background: #cffafe; color: #155e75; } .v40-queue .q .st.st-prometido { background: #fff7e6; color: #92400e; }

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CalendarCheck2, Check, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, EyeOff, Inbox, Trash2, Users, X } from "lucide-react";
 import type { Project, State } from "@/lib/types";
-import { KIND_LABEL, STATUS_TXT, TBD, addDaysISO, agendaBars, critiques, inQueueDefault, mondayOf, panelPeople, planQueue, weekDays, type Critique, type Slot } from "@/lib/fila";
+import { KIND_LABEL, STATUS_TXT, TBD, addDaysISO, agendaBars, critiques, inQueueDefault, mondayOf, panelPeople, planQueue, splitPlan, weekDays, type Critique, type Slot } from "@/lib/fila";
 import { PHASES, phaseIndex } from "@/lib/flow";
 import { todayISO } from "@/lib/metrics";
 import { addBD } from "@/lib/forecast";
@@ -32,8 +32,7 @@ export default function ProximasImplantacoes({ data, onRefresh, notify, canWrite
   const [monday, setMonday] = useState(() => mondayOf(today)), [weeks, setWeeks] = useState(1), [draft, setDraft] = useState<Draft | null>(null), [peopleOpen, setPeopleOpen] = useState(false), [busy, setBusy] = useState(false);
   const days = useMemo(() => weekDays(monday, weeks), [monday, weeks]);
   const plan = useMemo(() => planQueue(data, today, addDaysISO(today, 400)), [data, today]);
-  const placed = plan.all.filter(s => s.status !== "sugerido" && s.consultant !== TBD);
-  const queue = plan.all.filter(s => s.status === "sugerido" || s.consultant === TBD);
+  const { placed, queue } = useMemo(() => splitPlan(plan.all), [plan]);
   const people = useMemo(() => panelPeople(data, placed, days), [data, placed, days]);
   const hidden = useMemo(() => new Set(people.filter(n => { const st = data.staff.find(s => s.name === n); return !st || !inQueueDefault(st); })), [people, data.staff]);
   const skip = useMemo(() => new Set(data.appointments.filter(a => placed.some(s => s.p.id === a.projectId && s.consultant === a.consultant && a.date && a.date >= s.start && a.date <= s.end)).map(a => a.id)), [data.appointments, placed]);
@@ -83,12 +82,13 @@ export default function ProximasImplantacoes({ data, onRefresh, notify, canWrite
         onSlot={canWrite ? s => setDraft({ slot: s, start: s.start, end: s.end, consultant: s.consultant === TBD ? "" : s.consultant, status: s.booking?.status || (s.status === "andamento" ? "agendado" : "pre"), fromQueue: false }) : undefined} /></div>
       <aside className="panel v40-queue">
         <h3><Inbox size={17} /> Na fila <em>{queue.length}</em></h3>
-        <p>Clientes esperando data ou consultor, pela previsão da esteira. Arraste para o calendário.</p>
+        <p>Tudo que ainda não foi marcado: fases em andamento, datas prometidas e sugestões pela previsão. Arraste para o dia e o consultor.</p>
         <div className="list">{queue.map(s => <div key={s.id} className={`q ${s.kind}`} draggable={canWrite} onDragStart={e => { e.dataTransfer.setData("text/v40-queue", s.id); e.dataTransfer.effectAllowed = "copy"; }}
           onClick={canWrite ? () => setDraft({ slot: s, start: s.start, end: s.end, consultant: s.consultant === TBD ? "" : s.consultant, status: "pre", fromQueue: true }) : undefined}>
           <em>{s.kind === "golive" ? "GO-LIVE" : "HOMOLOG."}</em>
           <b className="v32-nm"><ClientLogo clientId={s.clientId} size={18} />{s.client}</b>
-          <small>{short(s.phaseNow)} · previsão {dm(s.start)}{s.consultant !== TBD ? ` · ${s.consultant}` : ""}</small>
+          <small>{short(s.phaseNow)} · {s.status === "andamento" ? "em andamento agora" : s.status === "prometido" ? `prometido ${dm(s.start)}` : `previsão ${dm(s.start)}`}{s.consultant !== TBD ? ` · ${s.consultant}` : ""}</small>
+          {s.status !== "sugerido" && <i className={`st st-${s.status}`}>{s.status === "andamento" ? "Em andamento · marcar dias" : "Data prometida · confirmar"}</i>}
         </div>)}
           {!queue.length && <div className="empty">Fila vazia: tudo com data e consultor.</div>}</div>
       </aside>

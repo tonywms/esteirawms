@@ -30,6 +30,8 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
     {people.map((person, pi) => {
       const mine = slots.filter(s => s.consultant === person && s.end >= days[0] && s.start <= days[n - 1]);
       const ag = agenda.filter(a => a.person === person);
+      // mesma pessoa em dois lugares ao mesmo tempo
+      const clash = new Set(mine.filter(x => mine.some(y => y !== x && y.start <= x.end && x.start <= y.end) || ag.some(a => a.clientId !== x.clientId && !a.office && a.start <= x.end && x.start <= a.end)).map(x => x.id));
       const key = person;
       return <div key={person} className={`v40-row ${over === key ? "over" : ""} ${hidden?.has(person) ? "ghost" : ""}`} style={{ animationDelay: `${(pi % 10) * 60}ms` }}>
         <span className="who"><PersonPhoto name={person} size={tv ? 40 : 30} /><b>{person}</b>{hidden?.has(person) && <em title="Fora do painel, mas tem ida a campo marcada">extra</em>}</span>
@@ -41,9 +43,9 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
           <div className="bars">
             {ag.map(a => { const sp = span(a.start, a.end); if (!sp) return null; return <span key={a.id} className={`ag ${a.office ? "office" : ""}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }} title={`Agenda: ${a.client} · ${a.title}`}>{a.office ? <Building2 size={tv ? 16 : 12} /> : <ClientLogo clientId={a.clientId} size={tv ? 18 : 14} />}<b>{a.office ? "Escritório" : a.client}</b>{!compact && <small>{a.title}</small>}</span>; })}
             {mine.map(s => { const sp = span(s.start, s.end); if (!sp) return null; const ok = !!onDropSlot && s.status !== "realizado";
-              return <button type="button" key={s.id} className={`bar ${s.kind} st-${s.status}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }}
+              return <button type="button" key={s.id} className={`bar ${s.kind} st-${s.status} ${clash.has(s.id) ? "clash" : ""}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }}
                 draggable={ok} onDragStart={ok ? e => { e.dataTransfer.setData("text/v40-slot", s.id); e.dataTransfer.effectAllowed = "move"; } : undefined}
-                onClick={onSlot ? () => onSlot(s) : undefined} disabled={!onSlot && !tv} title={`${s.client} · ${s.kind === "golive" ? "Go-live" : "Homologação"} · ${STATUS_TXT[s.status]} · ${dm(s.start)} a ${dm(s.end)}`}>
+                onClick={onSlot ? () => onSlot(s) : undefined} disabled={!onSlot && !tv} title={`${s.client} · ${s.kind === "golive" ? "Go-live" : "Homologação"} · ${STATUS_TXT[s.status]} · ${dm(s.start)} a ${dm(s.end)}${clash.has(s.id) ? " · CONFLITO: a mesma pessoa em outro cliente nesses dias" : ""}`}>
                 {ok && !compact && <GripVertical className="grip" size={13} />}<em>{s.kind === "golive" ? "GO-LIVE" : "HOMOLOG."}</em><b className="v32-nm"><ClientLogo clientId={s.clientId} size={tv ? 24 : 18} />{s.client}</b>{!compact && <small>{STATUS_TXT[s.status]}</small>}
               </button>; })}
           </div>

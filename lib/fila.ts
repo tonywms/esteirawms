@@ -8,7 +8,7 @@ import type { Appointment, Booking, Project, Staff, State } from "./types";
 import { docStates, isArchived, phaseIndex, phaseOf, phaseOwner, type PhaseKey } from "./flow";
 import { isBlocked, isDone, todayISO } from "./metrics";
 import { addBD, forecastAll } from "./forecast";
-import { isInternalProject } from "./internal";
+import { INTERNAL_PROJECT_ID, internalName, isInternalProject } from "./internal";
 import { infraSummary, pendText } from "./infra";
 import { samePerson } from "./timeline";
 
@@ -77,7 +77,7 @@ export function planQueue(s: State, today = todayISO(), until = `${today.slice(0
   const mark = (c: string, a: string, b: string) => { if (c === TBD) return; const l = busy.get(c) || []; l.push([a, b]); busy.set(c, l); };
   for (const x of fixed) mark(x.consultant, x.start, x.end);
   for (const a of s.appointments) if (a.date && a.status !== "Cancelado" && a.date >= today) {
-    const pr = s.projects.find(p => p.id === a.projectId); if (pr && isInternalProject(pr)) continue; // escritório não ocupa a semana
+    const pr = s.projects.find(p => p.id === a.projectId); if ((pr && isInternalProject(pr)) || a.projectId === INTERNAL_PROJECT_ID || internalName(a.clientId)) continue; // escritório não ocupa a semana
     const n = s.appointments.filter(x => x.consultant === a.consultant && x.status !== "Cancelado" && x.date && mondayOf(x.date) === mondayOf(a.date!)).length;
     if (n >= 3) mark(a.consultant, mondayOf(a.date), addDaysISO(mondayOf(a.date), 4));
   }
@@ -108,8 +108,16 @@ export const inQueueDefault = (s: Staff) => s.inQueue ?? /consult|implant/i.test
 export function panelPeople(st: State, slots: Slot[], days: string[]) {
   const from = days[0], to = days[days.length - 1];
   const on = st.staff.filter(s => s.active && inQueueDefault(s)).map(s => s.name);
-  const busy = slots.filter(x => x.consultant !== TBD && x.start <= to && x.end >= from).map(x => x.consultant); // alguém oculto com ida a campo marcada aparece mesmo assim
+  // quem não foi escolhido (nem ocultado de propósito) aparece só na semana em que tiver ida a campo marcada
+  const busy = slots.filter(x => x.consultant !== TBD && x.booking && x.start <= to && x.end >= from).map(x => x.consultant)
+    .filter(n => st.staff.find(s => s.name === n)?.inQueue !== false);
   return [...new Set([...on, ...busy])].sort((a, b) => a.localeCompare(b));
+}
+/** No calendário só entra o que alguém marcou (pré-agendado, agendado, realizado). O resto vai para a fila. */
+export function splitPlan(all: Slot[]) {
+  const placed = all.filter(s => !!s.booking && s.consultant !== TBD);
+  const queue = all.filter(s => !s.booking || s.consultant === TBD);
+  return { placed, queue };
 }
 export type AgendaBar = { id: string; person: string; clientId: string; client: string; title: string; start: string; end: string; office: boolean; appointments: Appointment[] };
 /** Agenda do consultor no período, juntando dias seguidos no mesmo cliente numa barra só. */
@@ -122,8 +130,8 @@ export function agendaBars(st: State, days: string[], people: string[], skipIds:
       const prev = out.find(b => b.person === person && b.clientId === a.clientId && days.indexOf(b.end) === days.indexOf(a.date!) - 1);
       if (prev) { prev.end = a.date!; prev.appointments.push(a); continue; }
       if (out.some(b => b.person === person && b.clientId === a.clientId && b.start <= a.date! && b.end >= a.date!)) continue;
-      const pr = st.projects.find(p => p.id === a.projectId);
-      out.push({ id: a.id, person, clientId: a.clientId, client: name(a.clientId), title: a.title, start: a.date!, end: a.date!, office: !!pr && isInternalProject(pr), appointments: [a] });
+      const pr = st.projects.find(p => p.id === a.projectId), office = (!!pr && isInternalProject(pr)) || a.projectId === INTERNAL_PROJECT_ID || !!internalName(a.clientId);
+      out.push({ id: a.id, person, clientId: a.clientId, client: internalName(a.clientId) || name(a.clientId), title: a.title, start: a.date!, end: a.date!, office, appointments: [a] });
     }
   }
   return out;
