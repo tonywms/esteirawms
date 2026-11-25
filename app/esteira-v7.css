@@ -2397,3 +2397,59 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v40-main.wide .v40-cal.compact { min-width: calc(var(--who) + var(--n) * 56px); }
 .v40-main.wide .v40-queue { position: static; max-height: none; }
 .v40-main.wide .v40-queue .list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); max-height: 360px; }
+
+/* ===== V42 · cliente em cima (inteiro, sem corte), tipo embaixo com ícone ===== */
+.v40-row .bar, .v40-row .ag { display: flex !important; flex-direction: column; justify-content: center; align-items: stretch; gap: 3px; padding: 7px 10px; min-height: 48px; text-align: left; white-space: normal; }
+.v40-row .bar .grip { position: absolute; left: 3px; top: 50%; transform: translateY(-50%); opacity: .55; }
+.v40-row .bar:has(.grip) { padding-left: 18px; }
+.v42-top { display: flex; align-items: flex-start; gap: 7px; min-width: 0; }
+.v42-top b { flex: 1; min-width: 0; display: block !important; -webkit-line-clamp: unset !important; overflow: visible !important; white-space: normal !important; word-break: normal !important; overflow-wrap: normal !important; hyphens: manual; font-size: 14px !important; font-weight: 800; line-height: 1.15; color: #fff; text-overflow: clip; }
+.v42-top .v42-logo, .v42-top .v42-cli { flex: none; margin-top: 1px; }
+.v42-top .v42-logo { background: #fff; border-radius: 6px; border: 0; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+.v42-cli { display: grid; place-items: center; border-radius: 6px; background: rgba(255, 255, 255, .24); color: #fff; }
+.v42-sub { display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 11px; font-weight: 800; letter-spacing: .02em; color: rgba(255, 255, 255, .95); white-space: nowrap; overflow: hidden; }
+.v42-sub > svg { flex: none; }
+.v42-sub > span { text-transform: uppercase; font-size: 10.5px; }
+.v42-sub small { font-weight: 600; font-size: 11px; opacity: .9; overflow: hidden; text-overflow: ellipsis; text-transform: none; letter-spacing: 0; }
+/* selos PRÉ / conflito ficam no canto de cima, fora do nome */
+.v40-row .bar.st-pre, .v40-row .bar.clash, .v40-row .bar.st-pre.clash { padding-right: 10px; padding-top: 7px; }
+.v40-row .bar.st-pre::after { top: 6px; right: 6px; transform: none; font-size: 9px; padding: 1px 6px; }
+.v40-row .bar.clash::before { top: auto; bottom: 6px; right: 6px; transform: none; font-size: 9px; padding: 1px 6px; content: "⚠ conflito"; }
+.v40-row .bar.st-pre .v42-top { padding-right: 34px; }
+.v40-row .bar.clash .v42-sub { padding-right: 70px; }
+/* compacto (4 semanas / TV 3 semanas) */
+.v40-cal.compact .v40-row .bar, .v40-cal.compact .v40-row .ag { padding: 5px 6px !important; gap: 2px; min-height: 40px; }
+.v40-cal.compact .v42-top { gap: 4px; } .v40-cal.compact .v42-top b { font-size: 11.5px !important; hyphens: auto; }
+.v40-cal.compact .v42-sub > span { font-size: 9px; } 
+.v40-cal.compact .v40-row .bar.st-pre .v42-top, .v40-cal.compact .v40-row .bar.clash .v42-sub { padding-right: 8px; }
+.v40-cal.compact .v40-row .bar.st-pre::after { content: ""; width: 7px; height: 7px; padding: 0; top: 4px; right: 4px; }
+.v40-cal.compact .v40-row .bar.clash::before { content: ""; width: 7px; height: 7px; padding: 0; bottom: 4px; right: 4px; }
+/* TV */
+.v40-cal.tv .v40-row .bar, .v40-cal.tv .v40-row .ag { padding: 1vh .7vw !important; gap: .4vh; min-height: 6vh; border-radius: 1.2vh; }
+.v40-cal.tv .v42-top b { font-size: clamp(14px, 2.2vh, 30px) !important; }
+.v40-cal.tv .v42-sub > span { font-size: clamp(10px, 1.35vh, 18px); } .v40-cal.tv .v42-sub small { font-size: clamp(10px, 1.35vh, 18px); }
+.v40-cal.tv.compact .v42-top b { font-size: clamp(12px, 1.8vh, 24px) !important; }
+.v40-cal.tv .v40-row .bar.st-pre::after, .v40-cal.tv .v40-row .bar.clash::before { font-size: clamp(9px, 1.15vh, 15px); }
+/* legenda com ícones */
+.v40-legend .k { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; letter-spacing: .02em; }
+.v40-legend .k.office { background: linear-gradient(90deg, #334155, #64748b); } .v40-legend .k.dev { background: linear-gradient(90deg, #b45309, #f59e0b); }
+.v40-legend .k.treino { background: linear-gradient(90deg, #0f766e, #14b8a6); } .v40-legend .k.campo { background: linear-gradient(90deg, #c2410c, #f97316); }
+/* card "Painel da TV" */
+.v42-tvcard { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px; border-radius: 14px; background: linear-gradient(100deg, #0b2540, #0f4c6b); color: #e3f1f8; box-shadow: 0 10px 24px -16px #0b2540; }
+.v42-tvcard .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, .12); color: #7fe9f7; }
+.v42-tvcard .tx { display: grid; } .v42-tvcard .tx b { font-size: 14.5px; color: #fff; } .v42-tvcard .tx small { font-size: 12px; color: #a9c4d8; }
+.v42-tvcard .opts { display: inline-flex; gap: 6px; background: rgba(255, 255, 255, .08); border-radius: 12px; padding: 4px; }
+.v42-tvcard .opts button { border: 0; background: none; color: #cfe3ef; font: inherit; font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 9px; cursor: pointer; }
+.v42-tvcard .opts button.on { background: linear-gradient(100deg, #06b6d4, #22d3ee); color: #06263a; }
+.v42-tvcard .opts button:disabled { cursor: not-allowed; opacity: .6; }
+.v42-tvcard a { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: #7fe9f7; font-weight: 700; font-size: 13px; text-decoration: none; padding: 7px 12px; border-radius: 10px; border: 1px solid rgba(127, 233, 247, .35); }
+.v42-tvcard a:hover { background: rgba(127, 233, 247, .1); }
+/* V42 · selos no canto de cima, lado a lado (PRÉ à direita, conflito antes) */
+.v40-row .bar.clash::before { top: 6px; bottom: auto; right: 6px; }
+.v40-row .bar.st-pre.clash::before { right: calc(6px + 3.4em); }
+.v40-row .bar.clash .v42-sub { padding-right: 0; }
+.v40-row .bar.clash .v42-top { padding-right: 76px; } .v40-row .bar.st-pre.clash .v42-top { padding-right: 112px; }
+.v40-cal.tv .v40-row .bar.st-pre .v42-top { padding-right: 3.2vw; }
+.v40-cal.tv .v40-row .bar.clash .v42-top { padding-right: 6.2vw; } .v40-cal.tv .v40-row .bar.st-pre.clash .v42-top { padding-right: 9.4vw; }
+.v40-cal.compact .v40-row .bar.clash::before { top: auto; bottom: 4px; right: 4px; }
+.v40-cal.compact .v40-row .bar.clash .v42-top, .v40-cal.compact .v40-row .bar.st-pre.clash .v42-top, .v40-cal.tv.compact .v40-row .bar .v42-top { padding-right: 8px; }

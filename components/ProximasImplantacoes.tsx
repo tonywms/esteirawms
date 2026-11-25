@@ -69,6 +69,12 @@ export default function ProximasImplantacoes({ data, onRefresh, notify, canWrite
       <h1>Próximas implantações</h1>
       <p>Quem vai a campo, onde e em que dia. Arraste da fila para o dia e o consultor, arraste as barras para remarcar ou clique num dia vazio para alocar.</p>
     </div></div>
+    <div className="v42-tvcard">
+      <span className="ic"><Tv size={20} /></span>
+      <span className="tx"><b>Painel da TV</b><small>Quantas semanas a TV mostra em “Próximas implantações”{canPeople ? "" : " · só Administrador e Gestor alteram"}</small></span>
+      <div className="opts" role="group" aria-label="Semanas na TV">{[1, 2, 3].map(w => <button key={w} type="button" className={tvWeeks === w ? "on" : ""} disabled={!canPeople} onClick={() => void setTvWeeks(w)}>{w === 1 ? "1 semana" : `${w} semanas`}</button>)}</div>
+      <a href="/tv" target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir a TV</a>
+    </div>
     <div className="v40-bar">
       <div className="nav">
         <button type="button" onClick={() => setMonday(m => addDaysISO(m, -7))} aria-label="Semana anterior"><ChevronLeft size={18} /></button>
@@ -78,7 +84,6 @@ export default function ProximasImplantacoes({ data, onRefresh, notify, canWrite
       </div>
       <div className="seg">{[1, 2, 4].map(w => <button key={w} type="button" className={weeks === w ? "on" : ""} onClick={() => setWeeks(w)}>{w === 1 ? "1 semana" : `${w} semanas`}</button>)}</div>
       <FilaLegend />
-      {canPeople && <div className="seg v41-tvw" title="Quantas semanas a TV mostra em Próximas implantações"><span><Tv size={14} /> TV</span>{[1, 2, 3].map(w => <button key={w} type="button" className={tvWeeks === w ? "on" : ""} onClick={() => void setTvWeeks(w)}>{w} sem.</button>)}</div>}
       <span className="sp" />
       {canWrite && <button type="button" className="btn primary small v41-add" onClick={() => setAlloc({ person: "", day: today })}><CalendarPlus size={15} /> Alocar</button>}
       <button type="button" className="btn outline small" onClick={() => setPeopleOpen(true)}><Users size={14} /> Pessoas no painel</button>

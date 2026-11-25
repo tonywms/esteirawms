@@ -3,7 +3,8 @@
 // Barras: Homologação (azul) e Go-live (roxo); agenda comum do consultor aparece clarinha por baixo.
 // No sistema dá para arrastar a barra para outro dia/consultor; na TV é só leitura.
 import { useState } from "react";
-import { Building2, CalendarDays, GripVertical } from "lucide-react";
+import { Building2, CalendarDays, ClipboardCheck, GraduationCap, GripVertical, HardHat, Plug, Rocket, type LucideIcon } from "lucide-react";
+import { logoUrl } from "@/lib/logos";
 import type { Slot } from "@/lib/fila";
 import { STATUS_TXT, type AgendaBar } from "@/lib/fila";
 import { ClientLogo } from "./ClientLogo";
@@ -20,7 +21,14 @@ function Face({ name, size }: { name: string; size: number }) {
 }
 
 const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const TONE_TXT: Record<AgendaBar["tone"], string> = { golive: "GO-LIVE", homolog: "HOMOLOG.", campo: "IMPLANT.", treino: "TREINO", dev: "INTEGR.", office: "ESCRIT.", outro: "AGENDA" };
+/* V42 · ícone e nome por tipo de ida a campo (embaixo do nome do cliente) */
+const TONE_ICON: Record<AgendaBar["tone"], LucideIcon> = { golive: Rocket, homolog: ClipboardCheck, campo: HardHat, treino: GraduationCap, dev: Plug, office: Building2, outro: CalendarDays };
+const TONE_NAME: Record<AgendaBar["tone"], string> = { golive: "Go-live", homolog: "Homologação", campo: "Implantação", treino: "Treinamento", dev: "Integração", office: "Escritório", outro: "Agenda" };
+/** Logo do cliente; sem logo, um ícone de prédio (SVG). */
+function CliIcon({ clientId, size, office }: { clientId?: string; size: number; office?: boolean }) {
+  if (!office && clientId && logoUrl(clientId)) return <ClientLogo clientId={clientId} size={size} className="v42-logo" />;
+  return <span className="v42-cli" style={{ width: size, height: size }}><Building2 size={Math.round(size * 0.62)} /></span>;
+}
 const dm = (d: string) => `${d.slice(8)}/${d.slice(5, 7)}`;
 type Props = {
   days: string[]; people: string[]; slots: Slot[]; agenda: AgendaBar[]; today: string; tv?: boolean; compact?: boolean;
@@ -55,12 +63,15 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
           <div className="grid">{days.map((d, i) => <i key={d} className={`${d === today ? "today" : ""} ${i > 0 && i % 5 === 0 ? "wk" : ""}`} />)}</div>
           <div className="bars">
             {ag.map(a => { const sp = span(a.start, a.end); if (!sp) return null; return <span key={a.id} className={`ag t-${a.tone}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }} title={`Agenda: ${a.office ? "Escritório WMS Expert" : a.client} · ${a.title} · ${dm(a.start)}${a.end !== a.start ? ` a ${dm(a.end)}` : ""}`}>
-              {!compact && <em>{TONE_TXT[a.tone]}</em>}{a.office ? <Building2 size={tv ? 18 : 14} /> : !compact && <ClientLogo clientId={a.clientId} size={tv ? 20 : 16} />}<b>{a.office ? "Escritório" : a.client}</b>{!compact && <small>{a.title}</small>}</span>; })}
+              <span className="v42-top"><CliIcon clientId={a.clientId} office={a.office} size={tv ? 26 : compact ? 16 : 20} /><b>{a.office ? "Escritório" : a.client}</b></span>
+              <span className="v42-sub">{(() => { const I = TONE_ICON[a.tone]; return <I size={tv ? 17 : 13} />; })()}<span>{TONE_NAME[a.tone]}</span>{!compact && !a.office && a.title && !new RegExp(TONE_NAME[a.tone].slice(0, 5), "i").test(a.title) && <small>· {a.title}</small>}</span></span>; })}
             {mine.map(s => { const sp = span(s.start, s.end); if (!sp) return null; const ok = !!onDropSlot && s.status !== "realizado";
               return <button type="button" key={s.id} className={`bar ${s.kind} st-${s.status} ${clash.has(s.id) ? "clash" : ""}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }}
                 draggable={ok} onDragStart={ok ? e => { e.dataTransfer.setData("text/v40-slot", s.id); e.dataTransfer.effectAllowed = "move"; } : undefined}
                 onClick={onSlot ? () => onSlot(s) : undefined} disabled={!onSlot && !tv} title={`${s.client} · ${s.kind === "golive" ? "Go-live" : "Homologação"} · ${STATUS_TXT[s.status]} · ${dm(s.start)} a ${dm(s.end)}${clash.has(s.id) ? " · CONFLITO: a mesma pessoa em outro cliente nesses dias" : ""}`}>
-                {ok && !compact && <GripVertical className="grip" size={13} />}{!compact && <em>{s.kind === "golive" ? "GO-LIVE" : "HOMOLOG."}</em>}<b className="v32-nm">{!compact && <ClientLogo clientId={s.clientId} size={tv ? 24 : 18} />}<span>{s.client}</span></b>{!compact && <small>{STATUS_TXT[s.status]}</small>}
+                {ok && !compact && <GripVertical className="grip" size={13} />}
+                <span className="v42-top"><CliIcon clientId={s.clientId} size={tv ? 26 : compact ? 16 : 20} /><b>{s.client}</b></span>
+                <span className="v42-sub">{s.kind === "golive" ? <Rocket size={tv ? 17 : 13} /> : <ClipboardCheck size={tv ? 17 : 13} />}<span>{s.kind === "golive" ? "Go-live" : "Homologação"}</span>{!compact && <small>· {STATUS_TXT[s.status]}</small>}</span>
               </button>; })}
           </div>
         </div>
@@ -71,5 +82,6 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
 }
 
 export function FilaLegend() {
-  return <div className="v40-legend"><span className="k homolog">HOMOLOG.</span><span className="k golive">GO-LIVE</span><span className="k campo">IMPLANT.</span><span className="k treino">TREINO</span><span className="k dev">INTEGR.</span><span className="k office">ESCRIT.</span><span className="s st-pre">claro + PRÉ = pré-agendado</span></div>;
+  const k = (t: AgendaBar["tone"]) => { const I = TONE_ICON[t]; return <span key={t} className={`k ${t}`}><I size={12} />{TONE_NAME[t]}</span>; };
+  return <div className="v40-legend">{(["homolog", "golive", "campo", "treino", "dev", "office"] as const).map(k)}<span className="s st-pre">claro + PRÉ = pré-agendado</span></div>;
 }
