@@ -17,8 +17,8 @@ import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 import { attackFirst, heatmap } from "@/lib/gargalos";
 import { tvPulse, tvRisks } from "@/lib/tv-pulse";
-import { planQueue, TBD } from "@/lib/fila";
-import { FilaBoard, FilaLegend } from "./FilaBoard";
+import { addDaysISO, agendaBars, panelPeople, planQueue, weekDays, TBD } from "@/lib/fila";
+import { FilaCalendar, FilaLegend } from "./FilaBoard";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
 import VersionWatcher from "./VersionWatcher";
 
@@ -48,7 +48,14 @@ export default function TvPanel() {
   const atk = useMemo(() => attackFirst(hm.heats, 8), [hm.heats]);
   const pulse = useMemo(() => tvPulse(data), [data]);
   const risks = useMemo(() => tvRisks(data), [data]);
-  const fila = useMemo(() => planQueue(data), [data]);
+  const fila = useMemo(() => { // V40: esta semana e a próxima, por dia
+    const today = todayISO(), plan = planQueue(data, today, addDaysISO(today, 400)), days = weekDays(mondayOf(today), 2);
+    const placed = plan.all.filter(x => x.status !== "sugerido" && x.consultant !== TBD);
+    const people = panelPeople(data, placed, days);
+    const skip = new Set(data.appointments.filter(a => placed.some(x => x.p.id === a.projectId && x.consultant === a.consultant && a.date && a.date >= x.start && a.date <= x.end)).map(a => a.id));
+    const queue = plan.all.filter(x => x.status === "sugerido" || x.consultant === TBD);
+    return { days, placed, people, agenda: agendaBars(data, days, people, skip), queue, today };
+  }, [data]);
   const name = (id: string) => data.clients.find(c => c.id === id)?.name || "Cliente";
 
   return <div className="v7-tv" onDoubleClick={() => void document.documentElement.requestFullscreen?.()}>
@@ -94,8 +101,9 @@ export default function TvPanel() {
         </div>
       </div>)}
     </section> : view === 2 ? <section className="v39-tv">
-      <div className="v39-tv-top"><FilaLegend /><span>{fila.inRange.filter(x => x.status === "agendado").length} agendados · {fila.inRange.filter(x => x.status === "pre" || x.status === "prometido").length} pré-agendados · {fila.inRange.filter(x => x.status === "sugerido").length} sugestões{fila.inRange.some(x => x.consultant === TBD) ? ` · ${fila.inRange.filter(x => x.consultant === TBD).length} sem consultor` : ""}</span></div>
-      <FilaBoard weeks={fila.weeks} consultants={fila.consultants} slots={fila.inRange} today={fila.from > todayISO() ? fila.from : todayISO()} tv maxPerCell={3} />
+      <div className="v39-tv-top"><FilaLegend /><span>{fila.placed.filter(x => x.end >= fila.days[0] && x.start <= fila.days[9]).length} idas a campo nas 2 semanas · {fila.queue.length} na fila</span></div>
+      <FilaCalendar days={fila.days} people={fila.people} slots={fila.placed} agenda={fila.agenda} today={fila.today} tv />
+      {fila.queue.length > 0 && <div className="v40-tvq"><span className="t">Próximos na fila</span>{fila.queue.slice(0, 6).map(q => <span key={q.id} className={`q ${q.kind}`}><em>{q.kind === "golive" ? "G" : "H"}</em><b className="v32-nm"><ClientLogo clientId={q.clientId} size={20} />{q.client}</b><small>{fmtDate(q.start).slice(0, 5)}</small></span>)}{fila.queue.length > 6 && <span className="more">+{fila.queue.length - 6}</span>}</div>}
     </section> : view === 3 ? <section className="v38-attack">
       <div className="panel-tv">
         <h3><Siren /> Atacar primeiro <em>{atk.length}</em></h3>

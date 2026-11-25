@@ -1,34 +1,59 @@
 "use client";
-// V39 · Quadro de próximas implantações: consultor × semana, com Homologação (H) e Go-live (G).
+// V40 · Calendário de idas a campo: uma linha por consultor, uma coluna por dia útil.
+// Barras: Homologação (azul) e Go-live (roxo); agenda comum do consultor aparece clarinha por baixo.
+// No sistema dá para arrastar a barra para outro dia/consultor; na TV é só leitura.
+import { useState } from "react";
+import { Building2, CalendarDays, GripVertical } from "lucide-react";
 import type { Slot } from "@/lib/fila";
-import { STATUS_TXT, TBD, addDaysISO } from "@/lib/fila";
+import { STATUS_TXT, type AgendaBar } from "@/lib/fila";
 import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 
-const brS = (d: string) => d.slice(5).split("-").reverse().join("/");
-export function FilaBoard({ weeks, consultants, slots, today, tv = false, maxPerCell = 4, onSlot }: { weeks: string[]; consultants: string[]; slots: Slot[]; today: string; tv?: boolean; maxPerCell?: number; onSlot?: (s: Slot) => void }) {
-  const cur = weeks.find(w => w <= today && addDaysISO(w, 6) >= today);
-  return <div className={`v39-board ${tv ? "tv" : ""}`} style={{ gridTemplateColumns: `${tv ? "minmax(150px, 13vw)" : "190px"} repeat(${weeks.length}, minmax(${tv ? 0 : 150}px, 1fr))` }}>
-    <span className="hd who" />
-    {weeks.map(w => <span key={w} className={`hd ${w === cur ? "now" : ""}`}><b>{w === cur ? "Esta semana" : `Semana ${brS(w)}`}</b><small>{brS(w)} – {brS(addDaysISO(w, 4))}</small></span>)}
-    {consultants.map(c => <div key={c} className="ln" style={{ display: "contents" }}>
-      <span className={`who ${c === TBD ? "tbd" : ""}`}>{c === TBD ? <i>?</i> : <PersonPhoto name={c} size={tv ? 38 : 30} />}<b>{c}</b></span>
-      {weeks.map(w => {
-        const we = addDaysISO(w, 6), here = slots.filter(s => s.consultant === c && s.start <= we && s.end >= w);
-        return <div key={w} className={`cell ${w === cur ? "now" : ""}`}>
-          {here.slice(0, maxPerCell).map(s => <button type="button" key={s.id} className={`sl ${s.kind} st-${s.status}`} onClick={onSlot ? () => onSlot(s) : undefined} disabled={!onSlot} title={`${s.client} · ${s.kind === "golive" ? "Go-live" : "Homologação"} · ${STATUS_TXT[s.status]} · ${brS(s.start)} a ${brS(s.end)}${s.note ? ` · ${s.note}` : ""}`}>
-            <em>{s.kind === "golive" ? "G" : "H"}</em><b className="v32-nm"><ClientLogo clientId={s.clientId} size={tv ? 22 : 18} />{s.client}</b><small>{STATUS_TXT[s.status]}</small>
-          </button>)}
-          {here.length > maxPerCell && <span className="more">+{here.length - maxPerCell}</span>}
-        </div>;
-      })}
-    </div>)}
+const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const dm = (d: string) => `${d.slice(8)}/${d.slice(5, 7)}`;
+type Props = {
+  days: string[]; people: string[]; slots: Slot[]; agenda: AgendaBar[]; today: string; tv?: boolean; compact?: boolean;
+  onDropSlot?: (slotId: string, person: string, day: string) => void; onDropQueue?: (slotId: string, person: string, day: string) => void;
+  onSlot?: (s: Slot) => void; hidden?: Set<string>;
+};
+
+export function FilaCalendar({ days, people, slots, agenda, today, tv = false, compact = false, onDropSlot, onDropQueue, onSlot, hidden }: Props) {
+  const n = days.length, [over, setOver] = useState<string | null>(null);
+  const span = (a: string, b: string) => { const s = Math.max(0, days.findIndex(d => d >= a)), eIdx = days.reduce((acc, d, i) => (d <= b ? i : acc), -1); return eIdx < s ? null : { col: s + 1, len: eIdx - s + 1 }; };
+  const dayAt = (e: React.DragEvent, el: HTMLElement) => { const r = el.getBoundingClientRect(); return days[Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * n)))]; };
+  const drag = !!(onDropSlot || onDropQueue);
+  return <div className={`v40-cal ${tv ? "tv" : ""} ${compact ? "compact" : ""}`} style={{ ["--n" as string]: n }}>
+    <div className="v40-head">
+      <span className="corner"><CalendarDays size={tv ? 22 : 16} /></span>
+      <div className="days">{days.map((d, i) => <span key={d} className={`${d === today ? "today" : ""} ${i > 0 && i % 5 === 0 ? "wk" : ""}`}><b>{WD[new Date(d + "T12:00:00").getDay()]}</b><small>{dm(d)}</small></span>)}</div>
+    </div>
+    {people.map((person, pi) => {
+      const mine = slots.filter(s => s.consultant === person && s.end >= days[0] && s.start <= days[n - 1]);
+      const ag = agenda.filter(a => a.person === person);
+      const key = person;
+      return <div key={person} className={`v40-row ${over === key ? "over" : ""} ${hidden?.has(person) ? "ghost" : ""}`} style={{ animationDelay: `${(pi % 10) * 60}ms` }}>
+        <span className="who"><PersonPhoto name={person} size={tv ? 40 : 30} /><b>{person}</b>{hidden?.has(person) && <em title="Fora do painel, mas tem ida a campo marcada">extra</em>}</span>
+        <div className="lane"
+          onDragOver={drag ? e => { e.preventDefault(); setOver(key); } : undefined}
+          onDragLeave={drag ? () => setOver(o => (o === key ? null : o)) : undefined}
+          onDrop={drag ? e => { e.preventDefault(); setOver(null); const id = e.dataTransfer.getData("text/v40-slot"), q = e.dataTransfer.getData("text/v40-queue"), d = dayAt(e, e.currentTarget); if (id) onDropSlot?.(id, person, d); else if (q) onDropQueue?.(q, person, d); } : undefined}>
+          <div className="grid">{days.map((d, i) => <i key={d} className={`${d === today ? "today" : ""} ${i > 0 && i % 5 === 0 ? "wk" : ""}`} />)}</div>
+          <div className="bars">
+            {ag.map(a => { const sp = span(a.start, a.end); if (!sp) return null; return <span key={a.id} className={`ag ${a.office ? "office" : ""}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }} title={`Agenda: ${a.client} · ${a.title}`}>{a.office ? <Building2 size={tv ? 16 : 12} /> : <ClientLogo clientId={a.clientId} size={tv ? 18 : 14} />}<b>{a.office ? "Escritório" : a.client}</b>{!compact && <small>{a.title}</small>}</span>; })}
+            {mine.map(s => { const sp = span(s.start, s.end); if (!sp) return null; const ok = !!onDropSlot && s.status !== "realizado";
+              return <button type="button" key={s.id} className={`bar ${s.kind} st-${s.status}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }}
+                draggable={ok} onDragStart={ok ? e => { e.dataTransfer.setData("text/v40-slot", s.id); e.dataTransfer.effectAllowed = "move"; } : undefined}
+                onClick={onSlot ? () => onSlot(s) : undefined} disabled={!onSlot && !tv} title={`${s.client} · ${s.kind === "golive" ? "Go-live" : "Homologação"} · ${STATUS_TXT[s.status]} · ${dm(s.start)} a ${dm(s.end)}`}>
+                {ok && !compact && <GripVertical className="grip" size={13} />}<em>{s.kind === "golive" ? "GO-LIVE" : "HOMOLOG."}</em><b className="v32-nm"><ClientLogo clientId={s.clientId} size={tv ? 24 : 18} />{s.client}</b>{!compact && <small>{STATUS_TXT[s.status]}</small>}
+              </button>; })}
+          </div>
+        </div>
+      </div>;
+    })}
+    {!people.length && <div className="v40-empty">Ninguém no painel. Use “Pessoas no painel” para escolher quem aparece.</div>}
   </div>;
 }
 
 export function FilaLegend() {
-  return <div className="v39-legend">
-    <span className="sl golive st-agendado"><em>G</em>Go-live</span><span className="sl homolog st-agendado"><em>H</em>Homologação</span>
-    <span className="dot st-agendado" />Agendado <span className="dot st-pre" />Pré-agendado <span className="dot st-prometido" />Data prometida <span className="dot st-andamento" />Em andamento <span className="dot st-sugerido" />Sugestão automática
-  </div>;
+  return <div className="v40-legend"><span className="k homolog">HOMOLOG.</span><span className="k golive">GO-LIVE</span><span className="s st-agendado">Agendado</span><span className="s st-pre">Pré-agendado</span><span className="s st-andamento">Em andamento</span><span className="s ag">Agenda</span></div>;
 }

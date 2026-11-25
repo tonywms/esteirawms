@@ -4,11 +4,13 @@
 //  2) fase em andamento agora (começou e ainda não terminou);
 //  3) data prometida no projeto (homologação / go-live);
 //  4) sugestão automática: previsão da esteira + a próxima semana livre do consultor (uma ida a campo por semana).
-import type { Booking, Project, State } from "./types";
-import { isArchived, phaseIndex, phaseOf, phaseOwner, type PhaseKey } from "./flow";
-import { isDone, todayISO } from "./metrics";
+import type { Appointment, Booking, Project, Staff, State } from "./types";
+import { docStates, isArchived, phaseIndex, phaseOf, phaseOwner, type PhaseKey } from "./flow";
+import { isBlocked, isDone, todayISO } from "./metrics";
 import { addBD, forecastAll } from "./forecast";
 import { isInternalProject } from "./internal";
+import { infraSummary, pendText } from "./infra";
+import { samePerson } from "./timeline";
 
 export type SlotKind = "homolog" | "golive";
 export type SlotStatus = "realizado" | "andamento" | "agendado" | "pre" | "prometido" | "sugerido";
@@ -35,8 +37,16 @@ export function consultantOf(p: Project, k: SlotKind, b?: Booking | null) {
   return GENERIC.test(norm(c)) ? TBD : c;
 }
 
+/** Mesmo nome com uma letra de diferença ("Giovani" x "Giovanni"). */
+function nearName(a: string, b: string) {
+  const x = norm(a).split(" ")[0], y = norm(b).split(" ")[0]; if (x.length < 5 || y.length < 5 || Math.abs(x.length - y.length) > 1) return false;
+  let i = 0, j = 0, diff = 0; while (i < x.length && j < y.length) { if (x[i] === y[j]) { i++; j++; continue; } if (++diff > 1) return false; if (x.length > y.length) i++; else if (y.length > x.length) j++; else { i++; j++; } }
+  return diff + (x.length - i) + (y.length - j) <= 1;
+}
 export function planQueue(s: State, today = todayISO(), until = `${today.slice(0, 4)}-12-31`) {
   const fc = forecastAll(s, today);
+  // nomes escritos diferente ("Giovanni" x "Giovani") viram a pessoa cadastrada na equipe
+  const canon = (n: string) => n === TBD ? n : s.staff.find(st => st.name === n)?.name || s.staff.find(st => samePerson(st.name, n))?.name || s.staff.find(st => nearName(st.name, n))?.name || n;
   const name = (id: string) => s.clients.find(c => c.id === id)?.name || "Cliente";
   const fixed: Slot[] = [], wants: { p: Project; kind: SlotKind; earliest: string; consultant: string }[] = [];
   const projects = s.projects.filter(p => !isInternalProject(p) && !isArchived(p, today) && !isDone(p.status) && phaseOf(p) !== "fim");
@@ -47,7 +57,7 @@ export function planQueue(s: State, today = todayISO(), until = `${today.slice(0
     for (const st of f?.steps || []) { if (st.phase === "homolog" && !homAt) homAt = addBD(today, acc); acc += st.days; }
     for (const kind of ["homolog", "golive"] as SlotKind[]) {
       if (kind === "homolog" && ki > phaseIndex("homolog")) continue; // homologação já passou
-      const b = p.phases?.[kind]?.booking || null, consultant = consultantOf(p, kind, b);
+      const b = p.phases?.[kind]?.booking || null, consultant = canon(consultantOf(p, kind, b));
       const base = { id: `${p.id}-${kind}`, p, clientId: p.clientId, client: name(p.clientId), kind, consultant, booking: b, phaseNow: k };
       if (b?.start) { fixed.push({ ...base, start: day(b.start), end: day(b.end) || weekEnd(day(b.start)), status: b.status, note: b.notes || "" }); continue; }
       if (k === kind) {
@@ -87,4 +97,56 @@ export function planQueue(s: State, today = todayISO(), until = `${today.slice(0
   const inRange = all.filter(x => x.end >= from && x.start <= until);
   const consultants = [...new Set(inRange.map(x => x.consultant))].sort((a, b) => (a === TBD ? 1 : b === TBD ? -1 : a.localeCompare(b)));
   return { all, inRange, later: all.filter(x => x.start > until), weeks, consultants, from, until };
+}
+
+/* ---------- V40 · Calendário por dia (consultor × dia), quem aparece e críticas ao mover ---------- */
+
+/** Dias úteis (seg–sex) a partir de uma segunda, por N semanas. */
+export function weekDays(monday: string, weeks = 1) { const out: string[] = []; for (let w = 0; w < weeks; w++) for (let i = 0; i < 5; i++) out.push(addDaysISO(monday, w * 7 + i)); return out; }
+/** Quem aparece no painel: marcado pelo gestor; sem marcação = consultores e implantação. */
+export const inQueueDefault = (s: Staff) => s.inQueue ?? /consult|implant/i.test(s.role || "");
+export function panelPeople(st: State, slots: Slot[], days: string[]) {
+  const from = days[0], to = days[days.length - 1];
+  const on = st.staff.filter(s => s.active && inQueueDefault(s)).map(s => s.name);
+  const busy = slots.filter(x => x.consultant !== TBD && x.start <= to && x.end >= from).map(x => x.consultant); // alguém oculto com ida a campo marcada aparece mesmo assim
+  return [...new Set([...on, ...busy])].sort((a, b) => a.localeCompare(b));
+}
+export type AgendaBar = { id: string; person: string; clientId: string; client: string; title: string; start: string; end: string; office: boolean; appointments: Appointment[] };
+/** Agenda do consultor no período, juntando dias seguidos no mesmo cliente numa barra só. */
+export function agendaBars(st: State, days: string[], people: string[], skipIds: Set<string>) {
+  const set = new Set(days), out: AgendaBar[] = [];
+  const name = (id: string) => st.clients.find(c => c.id === id)?.name || "Cliente";
+  for (const person of people) {
+    const apps = st.appointments.filter(a => a.consultant === person && a.date && set.has(a.date) && a.status !== "Cancelado" && !skipIds.has(a.id)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    for (const a of apps) {
+      const prev = out.find(b => b.person === person && b.clientId === a.clientId && days.indexOf(b.end) === days.indexOf(a.date!) - 1);
+      if (prev) { prev.end = a.date!; prev.appointments.push(a); continue; }
+      if (out.some(b => b.person === person && b.clientId === a.clientId && b.start <= a.date! && b.end >= a.date!)) continue;
+      const pr = st.projects.find(p => p.id === a.projectId);
+      out.push({ id: a.id, person, clientId: a.clientId, client: name(a.clientId), title: a.title, start: a.date!, end: a.date!, office: !!pr && isInternalProject(pr), appointments: [a] });
+    }
+  }
+  return out;
+}
+export type Critique = { level: "red" | "amber"; kind: "conflito" | "pdf" | "empecilho" | "infra" | "previsao" | "fase" | "consultor"; text: string };
+/** O que pode dar errado ao marcar esta ida a campo nestas datas com este consultor. */
+export function critiques(st: State, p: Project, kind: SlotKind, start: string, end: string, consultant: string, today = todayISO()): Critique[] {
+  const out: Critique[] = [], name = (id: string) => st.clients.find(c => c.id === id)?.name || "outro cliente";
+  if (!consultant || consultant === TBD) out.push({ level: "amber", kind: "consultor", text: "Sem consultor definido para ir a campo." });
+  else {
+    const apps = st.appointments.filter(a => a.consultant === consultant && a.status !== "Cancelado" && a.date && a.date >= start && a.date <= end && a.projectId !== p.id);
+    if (apps.length) out.push({ level: "red", kind: "conflito", text: `${consultant} já tem agenda: ${[...new Set(apps.map(a => `${name(a.clientId)} (${a.date!.slice(8)}/${a.date!.slice(5, 7)})`))].slice(0, 4).join(", ")}.` });
+    for (const q of st.projects) for (const k of ["homolog", "golive"] as SlotKind[]) {
+      const b = q.phases?.[k]?.booking; if (!b?.start || (q.id === p.id && k === kind) || b.status === "realizado") continue;
+      if ((b.consultant || "") === consultant && b.start <= end && (b.end || b.start) >= start) out.push({ level: "red", kind: "conflito", text: `${consultant} já está marcado em ${name(q.clientId)} (${k === "golive" ? "go-live" : "homologação"}) nessas datas.` });
+    }
+  }
+  const ki = phaseIndex(phaseOf(p)), need = kind === "golive" ? phaseIndex("golive") : phaseIndex("homolog");
+  const pend = docStates(p).filter(d => phaseIndex(d.key) < need && (d.state === "pending" || d.state === "missing"));
+  if (pend.length) out.push({ level: ki < need - 1 ? "amber" : "red", kind: "pdf", text: `Falta PDF antes de ${kind === "golive" ? "virar o go-live" : "homologar"}: ${pend.map(d => d.doc.replace("Documento de ", "")).join(", ")}.` });
+  if (isBlocked(p.status) || /[a-z0-9]/i.test(p.blocker || "")) out.push({ level: "red", kind: "empecilho", text: `Empecilho no projeto: ${(p.blocker || "").trim() || p.status}.` });
+  if (kind === "golive") { const inf = infraSummary(p).pending; if (inf.length) out.push({ level: "amber", kind: "infra", text: `Infra pendente: ${inf.map(pendText).join(", ")}.` }); }
+  if (ki < need - 1) out.push({ level: "amber", kind: "fase", text: `O projeto ainda está em ${phaseOf(p) === "kickoff" ? "Kickoff" : phaseOf(p) === "dev" ? "Dev & Integração" : "outra fase"} — confira se dá tempo.` });
+  if (start < today) out.push({ level: "amber", kind: "previsao", text: "Data no passado." });
+  return out;
 }
