@@ -49,7 +49,11 @@ export default function TvPanel() {
   const pulse = useMemo(() => tvPulse(data), [data]);
   const risks = useMemo(() => tvRisks(data), [data]);
   const fila = useMemo(() => { // V40: esta semana e a próxima, por dia
-    const today = todayISO(), plan = planQueue(data, today, addDaysISO(today, 400)), days = weekDays(mondayOf(today), 2);
+    // V41: quantas semanas mostrar (1, 2 ou 3) vem da configuração do painel; ?semanas=N na URL sobrepõe nesta TV
+    const qs = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("semanas")) : 0;
+    const cfgW = Number((data as State & { config?: { tvWeeks?: number } }).config?.tvWeeks) || 2;
+    const wk = [1, 2, 3].includes(qs) ? qs : [1, 2, 3].includes(cfgW) ? cfgW : 2;
+    const today = todayISO(), plan = planQueue(data, today, addDaysISO(today, 400)), days = weekDays(mondayOf(today), wk);
     const { placed, queue } = splitPlan(plan.all);
     const people = panelPeople(data, placed, days);
     const skip = new Set(data.appointments.filter(a => placed.some(x => x.p.id === a.projectId && x.consultant === a.consultant && a.date && a.date >= x.start && a.date <= x.end)).map(a => a.id));
@@ -100,8 +104,8 @@ export default function TvPanel() {
         </div>
       </div>)}
     </section> : view === 2 ? <section className="v39-tv">
-      <div className="v39-tv-top"><FilaLegend /><span>{fila.agenda.filter(a => !a.office).length} na agenda · {fila.placed.filter(x => x.end >= fila.days[0] && x.start <= fila.days[9]).length} homologações/go-lives marcados · {fila.queue.length} na fila</span></div>
-      <FilaCalendar days={fila.days} people={fila.people} slots={fila.placed} agenda={fila.agenda} today={fila.today} tv />
+      <div className="v39-tv-top"><FilaLegend /><span>{fila.agenda.filter(a => !a.office).length} na agenda · {fila.placed.filter(x => x.end >= fila.days[0] && x.start <= fila.days[fila.days.length - 1]).length} homologações/go-lives marcados · {fila.queue.length} na fila</span></div>
+      <FilaCalendar days={fila.days} people={fila.people} slots={fila.placed} agenda={fila.agenda} today={fila.today} tv compact={fila.days.length > 10} />
       {fila.queue.length > 0 && <div className="v40-tvq"><span className="t">Próximos na fila</span>{fila.queue.slice(0, 6).map(q => <span key={q.id} className={`q ${q.kind}`}><em>{q.kind === "golive" ? "G" : "H"}</em><b className="v32-nm"><ClientLogo clientId={q.clientId} size={20} />{q.client}</b><small>{fmtDate(q.start).slice(0, 5)}</small></span>)}{fila.queue.length > 6 && <span className="more">+{fila.queue.length - 6}</span>}</div>}
     </section> : view === 3 ? <section className="v38-attack">
       <div className="panel-tv">

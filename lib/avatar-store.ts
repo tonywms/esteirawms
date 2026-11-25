@@ -26,7 +26,7 @@ async function listAll(): Promise<AvatarEntry[]> {
 }
 // V32 · Os logos dos clientes ficam na mesma tabela, com chave "logo-..." e nome "logo:<id do cliente>".
 const isLogo = (r: { key: string; name: string }) => r.key.startsWith("logo-") && r.name.startsWith("logo:");
-export async function listAvatars(): Promise<AvatarEntry[]> { return (await listAll()).filter(r => !isLogo(r)); }
+export async function listAvatars(): Promise<AvatarEntry[]> { return (await listAll()).filter(r => !isLogo(r) && !r.key.startsWith("cfg-")); }
 export async function listLogos(): Promise<LogoEntry[]> { return (await listAll()).filter(isLogo).map(r => ({ clientId: r.name.slice(5), key: r.key, v: r.v })); }
 export async function getAvatar(key: string): Promise<string | null> {
   const c = cache.get(key); if (c && Date.now() - c.at < 60_000) return c.data;
@@ -65,4 +65,18 @@ export async function logoBytes(clientId?: string | null): Promise<Buffer | null
   if (!clientId) return null;
   const b64 = await getAvatar(logoKey(clientId)).catch(() => null);
   return b64 ? Buffer.from(b64, "base64") : null;
+}
+
+/** V41 · Configurações do painel (ex.: quantas semanas a TV mostra). Guardadas na mesma tabela, chave "cfg-...". */
+export type PanelConfig = { tvWeeks?: number };
+export async function getPanelConfig(): Promise<PanelConfig> {
+  const b64 = await getAvatar("cfg-painel").catch(() => null);
+  if (!b64) return {};
+  try { return JSON.parse(Buffer.from(b64, "base64").toString("utf8")) as PanelConfig; } catch { return {}; }
+}
+export async function setPanelConfig(cfg: PanelConfig, by?: string) {
+  const data = Buffer.from(JSON.stringify(cfg), "utf8").toString("base64");
+  if (supabaseConfigured()) await sbAvatarSet("cfg-painel", "cfg:painel", data, by);
+  else { const rows = (await readFile()).filter(r => r.key !== "cfg-painel"); rows.push({ key: "cfg-painel", name: "cfg:painel", data, updatedAt: new Date().toISOString(), by }); await writeFile(rows); }
+  cache.delete("cfg-painel"); listCache = null; return cfg;
 }

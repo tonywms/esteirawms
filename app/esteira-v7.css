@@ -2324,3 +2324,76 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 .v40-row .bar.st-pre::after { content: "PRÉ"; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 10px; font-weight: 900; color: var(--a); background: #fff; border-radius: 99px; padding: 2px 8px; text-shadow: none; }
 .v40-legend .s.st-pre { background: linear-gradient(90deg, #7dd3fc, #c4b5fd); color: #0d2b4a; border: 0; }
 .v40-legend .s.ag { display: none; }
+
+/* ===== V41 · nome do cliente inteiro, consultor só pela foto, alocar rápido ===== */
+.v40-cal { --who: 58px; min-width: calc(var(--who) + var(--n) * 96px); }
+.v40-cal.compact { min-width: calc(var(--who) + var(--n) * 62px); }
+.v40-cal .v40-head .corner { min-height: 40px; }
+.v40-row .who { position: relative; justify-content: center; padding: 6px 4px; }
+.v40-row .who .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.v40-row .who em { position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); margin: 0; font-size: 9px; padding: 0 5px; }
+.v40-row .who img, .v40-row .who > span:first-child { box-shadow: 0 0 0 3px #fff, 0 6px 14px -8px rgba(13, 43, 74, .6); border-radius: 99px; }
+/* nome do cliente: quebra em até 2 linhas em vez de cortar com reticências */
+.v40-row .bar b, .v40-row .ag b { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.15; word-break: break-word; overflow-wrap: anywhere; text-overflow: clip; }
+.v40-row .bar b.v32-nm { display: flex; align-items: center; gap: 6px; }
+.v40-row .bar b.v32-nm > span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-width: 0; }
+.v40-row .bar, .v40-row .ag { white-space: normal; align-content: center; }
+.v40-row .bar small, .v40-row .ag small { white-space: nowrap; }
+.v40-row .bar.st-pre { padding-right: 48px; }
+.v40-cal.compact .v40-row .bar, .v40-cal.compact .v40-row .ag { grid-template-columns: auto minmax(0, 1fr); padding: 5px 6px; column-gap: 4px; }
+.v40-cal.compact .v40-row .bar b, .v40-cal.compact .v40-row .ag b { font-size: 11.5px; }
+.v40-cal.compact .v40-row .ag { grid-template-columns: minmax(0, 1fr); }
+.v40-cal.compact .v40-row .ag > svg { display: none; }
+.v40-cal.compact .v40-row .bar em { grid-row: auto; width: 18px; height: 18px; display: grid; place-items: center; padding: 0; font-size: 10px; }
+.v40-cal.compact .v40-row .bar.st-pre { padding-right: 6px; }
+.v40-cal.compact .v40-row .bar.st-pre::after { content: "P"; right: 4px; top: 4px; transform: none; padding: 0 5px; font-size: 9px; }
+.v40-cal.compact .v40-row .bar.clash::before { content: "⚠"; right: 4px; padding: 0 5px; }
+/* clicar num dia vazio */
+.v40-row .lane.pick { cursor: copy; }
+.v40-row .lane.pick:hover { background: linear-gradient(0deg, rgba(26, 166, 214, .05), rgba(26, 166, 214, .05)), #fbfcfd; }
+.v40-row .lane .bars { pointer-events: none; } .v40-row .lane .bars > * { pointer-events: auto; }
+/* TV: fotos maiores, coluna estreita */
+.v40-cal.tv { --who: clamp(64px, 5.2vw, 110px); min-width: 0; }
+.v40-cal.tv .v40-row .who img, .v40-cal.tv .v40-row .who > span:first-child { box-shadow: 0 0 0 3px rgba(255, 255, 255, .18), 0 8px 18px -8px rgba(0, 0, 0, .7); }
+.v40-cal.tv.compact .v40-row .bar b, .v40-cal.tv.compact .v40-row .ag b { font-size: clamp(11px, 1.6vh, 22px); }
+/* barra de cima */
+.v41-tvw { align-items: center; } .v41-tvw > span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 800; color: #0d2b4a; padding: 0 6px 0 8px; }
+.v41-add { background: linear-gradient(100deg, #0f7f99, #1aa6d6) !important; border: 0 !important; color: #fff !important; box-shadow: 0 8px 18px -10px #0f7f99; }
+/* diálogo de alocação */
+.v41-alloc .body { display: grid; gap: 12px; }
+.v41-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.v41-types button { --a: #0284c7; --b: #38bdf8; border: 2px solid color-mix(in srgb, var(--a) 30%, #fff); background: #fff; color: var(--a); border-radius: 12px; padding: 9px 8px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.v41-types button:hover { transform: translateY(-1px); }
+.v41-types button.on { background: linear-gradient(100deg, var(--a), var(--b)); color: #fff; border-color: transparent; box-shadow: 0 8px 18px -10px var(--a); }
+.v41-types .golive { --a: #6d28d9; --b: #a78bfa; } .v41-types .campo { --a: #c2410c; --b: #f97316; } .v41-types .treino { --a: #0f766e; --b: #14b8a6; }
+.v41-types .dev { --a: #b45309; --b: #f59e0b; } .v41-types .office { --a: #334155; --b: #64748b; }
+.v41-pick .find { display: flex; align-items: center; gap: 8px; border: 1px solid #d8e1ea; border-radius: 12px; padding: 0 12px; background: #fff; color: #6b7c90; }
+.v41-pick .find input { border: 0; outline: 0; flex: 1; padding: 10px 0; font: inherit; font-size: 14px; background: none; }
+.v41-pick .opts { margin-top: 6px; max-height: 220px; overflow: auto; display: grid; gap: 4px; }
+.v41-pick .opts button { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; text-align: left; border: 1px solid #edf1f5; background: #f8fafc; border-radius: 10px; padding: 7px 10px; font: inherit; cursor: pointer; }
+.v41-pick .opts button:hover { background: #ecf8fc; border-color: #b6e3f2; }
+.v41-pick .opts b { font-size: 13px; color: #14213d; } .v41-pick .opts small { font-size: 11px; color: #6b7c90; }
+.v41-pick .none { font-size: 12.5px; color: #6b7c90; padding: 8px; }
+.v41-pick .chosen { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #ecf8fc; border: 1px solid #b6e3f2; }
+.v41-pick .chosen span { flex: 1; display: grid; } .v41-pick .chosen b { font-size: 14.5px; color: #0d2b4a; } .v41-pick .chosen small { font-size: 11.5px; color: #4b5d72; }
+@media (max-width: 560px) { .v41-types { grid-template-columns: repeat(2, 1fr); } }
+.v41-ini { display: grid; place-items: center; border-radius: 99px; color: #fff; font-weight: 900; letter-spacing: .02em; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); flex: none; }
+.v40-row .who .v41-ini { box-shadow: 0 0 0 3px #fff, 0 6px 14px -8px rgba(13, 43, 74, .6); }
+.v40-cal.tv .v40-row .who .v41-ini { box-shadow: 0 0 0 3px rgba(255, 255, 255, .18); }
+/* V41 · marcas PRÉ / conflito sem cobrir o nome */
+.v40-row .bar.st-pre.clash::before { right: 54px; }
+.v40-row .bar.clash { padding-right: 96px; } .v40-row .bar.st-pre.clash { padding-right: 140px; }
+.v40-cal.compact .v40-row .bar, .v40-cal.compact .v40-row .bar.st-pre, .v40-cal.compact .v40-row .bar.clash { grid-template-columns: minmax(0, 1fr); padding: 5px 7px; padding-right: 16px; }
+.v40-cal.compact .v40-row .bar.st-pre.clash { padding-right: 16px; }
+.v40-cal.compact .v40-row .bar b.v32-nm { gap: 0; }
+.v40-cal.compact .v40-row .bar.st-pre::after { content: ""; right: 5px; top: 5px; width: 7px; height: 7px; padding: 0; border-radius: 99px; background: #fff; box-shadow: 0 0 0 2px var(--a); }
+.v40-cal.compact .v40-row .bar.clash::before { content: ""; right: 5px; top: auto; bottom: 5px; transform: none; width: 7px; height: 7px; padding: 0; border-radius: 99px; background: #ef4444; box-shadow: 0 0 0 2px #fff; }
+.v40-cal.compact .v40-row .bar b, .v40-cal.compact .v40-row .ag b { -webkit-line-clamp: 3; font-size: 11px; line-height: 1.12; overflow-wrap: normal; word-break: normal; hyphens: auto; }
+.v40-cal.compact .v40-row .bar b.v32-nm > span { -webkit-line-clamp: 3; }
+.v40-cal.tv.compact .v40-row .bar b, .v40-cal.tv.compact .v40-row .ag b { font-size: clamp(11px, 1.6vh, 22px); }
+.v40-cal.tv.compact .v40-row .bar.st-pre::after, .v40-cal.tv.compact .v40-row .bar.clash::before { width: 1vh; height: 1vh; }
+/* 4 semanas: a fila desce para baixo do calendário e o calendário usa a largura toda */
+.v40-main.wide { grid-template-columns: 1fr; }
+.v40-main.wide .v40-cal.compact { min-width: calc(var(--who) + var(--n) * 56px); }
+.v40-main.wide .v40-queue { position: static; max-height: none; }
+.v40-main.wide .v40-queue .list { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); max-height: 360px; }
