@@ -119,7 +119,8 @@ export function splitPlan(all: Slot[]) {
   const queue = all.filter(s => !s.booking || s.consultant === TBD);
   return { placed, queue };
 }
-export type AgendaBar = { id: string; person: string; clientId: string; client: string; title: string; start: string; end: string; office: boolean; appointments: Appointment[] };
+export type AgendaTone = "golive" | "homolog" | "campo" | "treino" | "dev" | "office" | "outro";
+export type AgendaBar = { id: string; person: string; clientId: string; client: string; title: string; start: string; end: string; office: boolean; tone: AgendaTone; appointments: Appointment[] };
 /** Agenda do consultor no período, juntando dias seguidos no mesmo cliente numa barra só. */
 export function agendaBars(st: State, days: string[], people: string[], skipIds: Set<string>) {
   const set = new Set(days), out: AgendaBar[] = [];
@@ -127,11 +128,14 @@ export function agendaBars(st: State, days: string[], people: string[], skipIds:
   for (const person of people) {
     const apps = st.appointments.filter(a => a.consultant === person && a.date && set.has(a.date) && a.status !== "Cancelado" && !skipIds.has(a.id)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
     for (const a of apps) {
-      const prev = out.find(b => b.person === person && b.clientId === a.clientId && days.indexOf(b.end) === days.indexOf(a.date!) - 1);
+      const prev = out.find(b => b.person === person && b.clientId === a.clientId && b.title === a.title && days.indexOf(b.end) === days.indexOf(a.date!) - 1);
       if (prev) { prev.end = a.date!; prev.appointments.push(a); continue; }
-      if (out.some(b => b.person === person && b.clientId === a.clientId && b.start <= a.date! && b.end >= a.date!)) continue;
+      if (out.some(b => b.person === person && b.clientId === a.clientId && b.title === a.title && b.start <= a.date! && b.end >= a.date!)) continue;
       const pr = st.projects.find(p => p.id === a.projectId), office = (!!pr && isInternalProject(pr)) || a.projectId === INTERNAL_PROJECT_ID || !!internalName(a.clientId);
-      out.push({ id: a.id, person, clientId: a.clientId, client: internalName(a.clientId) || name(a.clientId), title: a.title, start: a.date!, end: a.date!, office, appointments: [a] });
+      const t = norm(a.title), ph = pr ? phaseOf(pr) : null;
+      const tone: AgendaTone = office ? "office" : /go.?live|virada/.test(t) ? "golive" : /homolog/.test(t) ? "homolog" : /treina|kickoff|cadastro|endere/.test(t) ? "treino" : /integra|dev/.test(t) ? "dev" : /implanta|campo|rollout/.test(t) ? "campo"
+        : ph === "golive" ? "golive" : ph === "homolog" ? "homolog" : ph === "campo" ? "campo" : ph === "dev" ? "dev" : ph === "kickoff" ? "treino" : "outro";
+      out.push({ id: a.id, person, clientId: a.clientId, client: internalName(a.clientId) || name(a.clientId), title: a.title, start: a.date!, end: a.date!, office, tone, appointments: [a] });
     }
   }
   return out;

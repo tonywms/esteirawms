@@ -10,6 +10,7 @@ import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 
 const WD = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const TONE_TXT: Record<AgendaBar["tone"], string> = { golive: "GO-LIVE", homolog: "HOMOLOG.", campo: "IMPLANT.", treino: "TREINO", dev: "INTEGR.", office: "ESCRIT.", outro: "AGENDA" };
 const dm = (d: string) => `${d.slice(8)}/${d.slice(5, 7)}`;
 type Props = {
   days: string[]; people: string[]; slots: Slot[]; agenda: AgendaBar[]; today: string; tv?: boolean; compact?: boolean;
@@ -41,7 +42,8 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
           onDrop={drag ? e => { e.preventDefault(); setOver(null); const id = e.dataTransfer.getData("text/v40-slot"), q = e.dataTransfer.getData("text/v40-queue"), d = dayAt(e, e.currentTarget); if (id) onDropSlot?.(id, person, d); else if (q) onDropQueue?.(q, person, d); } : undefined}>
           <div className="grid">{days.map((d, i) => <i key={d} className={`${d === today ? "today" : ""} ${i > 0 && i % 5 === 0 ? "wk" : ""}`} />)}</div>
           <div className="bars">
-            {ag.map(a => { const sp = span(a.start, a.end); if (!sp) return null; return <span key={a.id} className={`ag ${a.office ? "office" : ""}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }} title={`Agenda: ${a.client} · ${a.title}`}>{a.office ? <Building2 size={tv ? 16 : 12} /> : <ClientLogo clientId={a.clientId} size={tv ? 18 : 14} />}<b>{a.office ? "Escritório" : a.client}</b>{!compact && <small>{a.title}</small>}</span>; })}
+            {ag.map(a => { const sp = span(a.start, a.end); if (!sp) return null; return <span key={a.id} className={`ag t-${a.tone}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }} title={`Agenda: ${a.office ? "Escritório WMS Expert" : a.client} · ${a.title} · ${dm(a.start)}${a.end !== a.start ? ` a ${dm(a.end)}` : ""}`}>
+              <em>{TONE_TXT[a.tone]}</em>{a.office ? <Building2 size={tv ? 18 : 14} /> : <ClientLogo clientId={a.clientId} size={tv ? 20 : 16} />}<b>{a.office ? "Escritório" : a.client}</b>{!compact && <small>{a.title}</small>}</span>; })}
             {mine.map(s => { const sp = span(s.start, s.end); if (!sp) return null; const ok = !!onDropSlot && s.status !== "realizado";
               return <button type="button" key={s.id} className={`bar ${s.kind} st-${s.status} ${clash.has(s.id) ? "clash" : ""}`} style={{ gridColumn: `${sp.col} / span ${sp.len}` }}
                 draggable={ok} onDragStart={ok ? e => { e.dataTransfer.setData("text/v40-slot", s.id); e.dataTransfer.effectAllowed = "move"; } : undefined}
@@ -57,5 +59,5 @@ export function FilaCalendar({ days, people, slots, agenda, today, tv = false, c
 }
 
 export function FilaLegend() {
-  return <div className="v40-legend"><span className="k homolog">HOMOLOG.</span><span className="k golive">GO-LIVE</span><span className="s st-agendado">Agendado</span><span className="s st-pre">Pré-agendado</span><span className="s st-andamento">Em andamento</span><span className="s ag">Agenda</span></div>;
+  return <div className="v40-legend"><span className="k homolog">HOMOLOG.</span><span className="k golive">GO-LIVE</span><span className="k campo">IMPLANT.</span><span className="k treino">TREINO</span><span className="k dev">INTEGR.</span><span className="k office">ESCRIT.</span><span className="s st-pre">listrado = pré-agendado</span><span className="s ag">com borda = só na agenda</span></div>;
 }

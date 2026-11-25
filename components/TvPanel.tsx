@@ -100,7 +100,7 @@ export default function TvPanel() {
         </div>
       </div>)}
     </section> : view === 2 ? <section className="v39-tv">
-      <div className="v39-tv-top"><FilaLegend /><span>{fila.placed.filter(x => x.end >= fila.days[0] && x.start <= fila.days[9]).length} idas a campo nas 2 semanas · {fila.queue.length} na fila</span></div>
+      <div className="v39-tv-top"><FilaLegend /><span>{fila.agenda.filter(a => !a.office).length} na agenda · {fila.placed.filter(x => x.end >= fila.days[0] && x.start <= fila.days[9]).length} homologações/go-lives marcados · {fila.queue.length} na fila</span></div>
       <FilaCalendar days={fila.days} people={fila.people} slots={fila.placed} agenda={fila.agenda} today={fila.today} tv />
       {fila.queue.length > 0 && <div className="v40-tvq"><span className="t">Próximos na fila</span>{fila.queue.slice(0, 6).map(q => <span key={q.id} className={`q ${q.kind}`}><em>{q.kind === "golive" ? "G" : "H"}</em><b className="v32-nm"><ClientLogo clientId={q.clientId} size={20} />{q.client}</b><small>{fmtDate(q.start).slice(0, 5)}</small></span>)}{fila.queue.length > 6 && <span className="more">+{fila.queue.length - 6}</span>}</div>}
     </section> : view === 3 ? <section className="v38-attack">

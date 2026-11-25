@@ -2286,3 +2286,22 @@ body[data-perfil="Visualizador"] .v7-doc-act .v7-mini-btn:not(:first-child), bod
 @keyframes v40-clash { 0%, 100% { outline-color: #ef4444; } 50% { outline-color: rgba(239, 68, 68, .35); } }
 .v40-queue .q .st { font-style: normal; font-size: 10.5px; font-weight: 800; border-radius: 99px; padding: 1px 8px; width: fit-content; margin-top: 2px; }
 .v40-queue .q .st.st-andamento { background: #cffafe; color: #155e75; } .v40-queue .q .st.st-prometido { background: #fff7e6; color: #92400e; }
+
+/* ===== V40.2 · agenda colorida (onde cada um está de verdade) ===== */
+.v40-row .ag { --a: #64748b; --b: #94a3b8; display: grid; grid-template-columns: auto auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 6px; align-items: center; padding: 6px 10px; border-radius: 10px; color: #fff; background: linear-gradient(100deg, var(--a), var(--b)); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55), 0 6px 14px -9px var(--a); font-size: 11px; overflow: hidden; white-space: nowrap; animation: v40-in .45s ease both; }
+.v40-row .ag em { grid-row: 1 / span 2; font-style: normal; font-size: 9.5px; font-weight: 900; letter-spacing: .05em; background: rgba(255, 255, 255, .22); border-radius: 6px; padding: 2px 5px; }
+.v40-row .ag > svg, .v40-row .ag > .v32-logo { grid-row: 1 / span 2; }
+.v40-row .ag b { font-size: 12.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+.v40-row .ag small { grid-column: 3; font-size: 10.5px; opacity: .92; overflow: hidden; text-overflow: ellipsis; }
+.v40-row .ag.t-golive { --a: #6d28d9; --b: #a78bfa; } .v40-row .ag.t-homolog { --a: #0284c7; --b: #38bdf8; }
+.v40-row .ag.t-campo { --a: #ea580c; --b: #fb923c; } .v40-row .ag.t-treino { --a: #0d9488; --b: #2dd4bf; }
+.v40-row .ag.t-dev { --a: #ca8a04; --b: #facc15; } .v40-row .ag.t-office { --a: #059669; --b: #6ee7b7; } .v40-row .ag.t-outro { --a: #475569; --b: #94a3b8; }
+.v40-row .ag.t-office { background: repeating-linear-gradient(-45deg, #10b981 0 10px, #34d399 10px 20px); }
+.v40-row .ag .v32-logo { border-color: transparent; }
+.v40-legend .k.campo { background: linear-gradient(90deg, #ea580c, #fb923c); } .v40-legend .k.treino { background: linear-gradient(90deg, #0d9488, #2dd4bf); }
+.v40-legend .k.dev { background: linear-gradient(90deg, #ca8a04, #facc15); } .v40-legend .k.office { background: linear-gradient(90deg, #059669, #6ee7b7); }
+.v40-legend .s.ag { background: #fff; border: 2px solid #94a3b8; color: #4b5d72; }
+.v40-cal.tv .v40-row .ag { background: linear-gradient(100deg, var(--a), var(--b)); color: #fff; font-size: clamp(10px, 1.4vh, 18px); padding: .8vh .6vw; border-radius: 1.2vh; }
+.v40-cal.tv .v40-row .ag b { font-size: clamp(12px, 1.9vh, 26px); } .v40-cal.tv .v40-row .ag small { font-size: clamp(10px, 1.35vh, 18px); } .v40-cal.tv .v40-row .ag em { font-size: clamp(9px, 1.2vh, 16px); }
+.v40-cal.tv .v40-row .ag.t-office { background: repeating-linear-gradient(-45deg, #10b981 0 10px, #34d399 10px 20px); color: #fff; }
+.v40-cal.compact .v40-row .ag { padding: 4px 6px; } .v40-cal.compact .v40-row .ag em { display: none; }
