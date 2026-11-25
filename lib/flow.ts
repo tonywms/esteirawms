@@ -3,6 +3,7 @@
 import type { Project, State, PhaseInfo, Task } from "./types";
 import { isBlocked, isDone, todayISO } from "./metrics";
 import { infraSummary, pendText } from "./infra";
+import { isInternalProject } from "./internal";
 
 // V8 · Ordem oficial: Kickoff/Treinamento > Dev & Integração > Homologação > Implantação (opcional) > Go-live > Encerrado.
 // Cada fase (menos Encerrado) exige o seu PDF assinado para liberar o avanço.
@@ -123,7 +124,7 @@ export const healthLabel: Record<Health, string> = { green: "No fluxo", amber: "
 /** Projetos visíveis na operação: encerrados há mais de 30 dias vão para o arquivo. */
 export const isCancelled = (p: Project) => norm(p.status).includes("cancel");
 export function isArchived(p: Project, today = todayISO()) {
-  if (p.archivedAt || isCancelled(p)) return true;
+  if (p.archivedAt || isCancelled(p) || isInternalProject(p)) return true; // V39: interno (escritório) fora da operação
   if (phaseOf(p) !== "fim") return false;
   const closed = p.phases?.fim?.start || p.goLiveDate || p.lastMovement || isoDay(p.updatedAt);
   return (daysBetween(closed, today) ?? 0) > 30;

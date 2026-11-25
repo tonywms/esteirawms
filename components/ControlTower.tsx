@@ -14,6 +14,9 @@ import {addDays,asLocalDate,dueState,fmtDate,initials,isBlocked,isDone,projectOw
 import TaskAttachments from "./TaskAttachments";
 import MobileNav from "./MobileNav";
 import ErrorReporter from "./ErrorReporter";
+import ProximasImplantacoes from "./ProximasImplantacoes";
+import { splitInternal as splitInternalV39, internalProjects as internalProjectsV39, internalName as internalNameV39 } from "@/lib/internal";
+import { CalendarRange as CalendarRangeV39 } from "lucide-react"; /* WMS_ESTEIRA_V39 */
 import VersionWatcher from "./VersionWatcher"; /* WMS_ESTEIRA_V36 */
 import LinhaDoTempo from "./LinhaDoTempo";
 import { ChartGantt as GanttChartV31 } from "lucide-react"; /* WMS_ESTEIRA_V31 */
@@ -65,6 +68,7 @@ const paths=[
  {path:"/evolucao",label:"Evolução da esteira",icon:TrendingUpV18,group:"Gestão estratégica"},
  {path:"/previsao",label:"Previsão de go-live",icon:RocketV27,group:"Gestão estratégica"},
  {path:"/raio-x",label:"Raio-X",icon:ScanSearchV29,group:"Gestão estratégica"},
+ {path:"/proximas-implantacoes",label:"Próximas implantações",icon:CalendarRangeV39,group:"Gestão estratégica"},
  {path:"/linha-do-tempo",label:"Linha do tempo",icon:GanttChartV31,group:"Gestão estratégica"},
  {path:"/clientes",label:"Clientes",icon:Users,group:"Operação"},
  {path:"/projetos",label:"Projetos",icon:Layers3,group:"Operação"},
@@ -140,7 +144,7 @@ export default function ControlTower(){
  useEffect(()=>{if(profile)document.body.dataset.perfil=profile;else delete document.body.dataset.perfil},[profile]);
  const [topMenu,setTopMenu]=useState<"alerts"|"profile"|"quick"|null>(null);
  const route=pathname||"/",parts=route.split("/").filter(Boolean),current=parts[0]||"home";
- const refresh=useCallback(async()=>{try{const res=await fetch("/api/state",{cache:"no-store"});const json=await res.json();if(!res.ok)throw new Error(json.error||"Erro de leitura");registerAvatarsV26(json.avatars);registerLogosV32(json.logos,json.clients);setData(json);setError("")}catch(e){setError(e instanceof Error?e.message:"Erro ao carregar dados") }finally{setLoading(false)}},[]);
+ const refresh=useCallback(async()=>{try{const res=await fetch("/api/state",{cache:"no-store"});const json=await res.json();if(!res.ok)throw new Error(json.error||"Erro de leitura");registerAvatarsV26(json.avatars);registerLogosV32(json.logos,json.clients);setData(splitInternalV39(json));setError("")}catch(e){setError(e instanceof Error?e.message:"Erro ao carregar dados") }finally{setLoading(false)}},[]);
  useEffect(()=>{void refresh();const timer=window.setInterval(()=>void refresh(),30000);return ()=>window.clearInterval(timer)},[refresh]);
  useEffect(()=>{setSearch("");setFilter("");setGlobalQuery("");setTopMenu(null);setSidebar(false)},[pathname]);
  const metrics=useMemo(()=>summary(data),[data]);
@@ -193,7 +197,7 @@ export default function ControlTower(){
  const navigateClient=(client:Client)=>navigate(`/clientes/${client.id}`);
  const recordAction=(entity:EntityName,record:Record<string,unknown>,label:string)=> <div className="row-actions"><button title="Editar" className="icon-btn" onClick={e=>{e.stopPropagation();openForm(entity,record)}}><Wrench size={15}/></button><button title="Excluir" className="icon-btn destructive" onClick={e=>{e.stopPropagation();void remove(entity,String(record.id),label)}}><Trash2 size={15}/></button></div>;
  const names=data.clients.map(c=>c.name);
- const lookup=(id:string)=>safeName(data,id);
+ const lookup=(id:string)=>internalNameV39(id)||safeName(data,id);
  const ownerNames=[...new Set([...data.staff.map(u=>u.name),"Time de Implantação","Cliente","ERP Parceiro","A Definir"])];
  const panelHeader=(title:string,subtitle:string,entity?:EntityName,createLabel?:string)=> <PageHeader title={title} description={subtitle} actions={<><button className="btn ghost v4-secondary-action" onClick={()=>void refresh()}><RefreshCw size={16}/> Atualizar dados</button>{entity&&<button className="btn primary v4-primary-action" onClick={()=>openForm(entity)}><Plus size={17}/> {createLabel||"Novo cadastro"}</button>}</>}/>;
  const filterBy=(s:string,...values:string[])=>values.some(x=>x.toLowerCase().includes(s.toLowerCase()));
@@ -343,7 +347,7 @@ export default function ControlTower(){
  const content=()=>{
   if(parts[0]==="clientes"&&parts[1]){const c=data.clients.find(c=>c.id===parts[1]);return c?ClientDetail({client:c}):<Empty title="Cliente não encontrado"/>}
   if(parts[0]==="projetos"&&parts[1]){const p=data.projects.find(p=>p.id===parts[1]);return p?ProjectDetail({project:p}):<Empty title="Projeto não encontrado"/>}
-  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "erros":return (me as {master?:boolean}).master?<ErrorLog/>:<div className="v7-empty">Somente o administrador master vê os erros do sistema.</div>;case "linha-do-tempo":return <LinhaDoTempo data={data} onRefresh={refresh} notify={notify} canWrite={mayWrite("projects")} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "raio-x":return <RaioX data={data} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate} onRefresh={refresh} notify={notify} canLogos={mayWrite("clients")}/>;case "previsao":return <Previsao data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "minha-semana":return <MinhaSemana data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
+  switch(current){case "home":return Dashboard();case "clientes":return Clients();case "projetos":return Projects({variant:"all"});case "atividades":return Tasks();case "integracoes":return Projects({variant:"integrations"});case "implantacao":return Projects({variant:"implementation"});case "agenda":return Agenda();case "equipe":return Team();case "esteira":return <FlowBoard data={data} onRefresh={refresh} onEdit={p=>openForm("projects",p as unknown as Record<string,unknown>)} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "evolucao":return <Evolucao data={data} onNavigate={navigate}/>;case "gargalos":return <Gargalos data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "erros":return (me as {master?:boolean}).master?<ErrorLog/>:<div className="v7-empty">Somente o administrador master vê os erros do sistema.</div>;case "linha-do-tempo":return <LinhaDoTempo data={data} onRefresh={refresh} notify={notify} canWrite={mayWrite("projects")} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "proximas-implantacoes":return <ProximasImplantacoes data={data} onRefresh={refresh} notify={notify} canWrite={mayWrite("projects")} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "raio-x":return <RaioX data={data} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate} onRefresh={refresh} notify={notify} canLogos={mayWrite("clients")}/>;case "previsao":return <Previsao data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)}/>;case "minha-semana":return <MinhaSemana data={data} onRefresh={refresh} onOpen={p=>navigate(`/projetos/${p.id}`)} onNavigate={navigate}/>;case "relatorios":return Reports();case "configuracoes":return SettingsPage();case "usuarios":return UsersPage();default:return <Empty title="Página não localizada"/>}
  };
  const formInput=(key:FieldKey,label:string,opts:{type?:string;options?:string[];placeholder?:string;required?:boolean;multiline?:boolean;span?:boolean;custom?:ReactNode}={})=>{
   const value=form[key];const change=(x:unknown)=>setForm(f=>({...f,[key]:x}));
@@ -353,7 +357,7 @@ export default function ControlTower(){
  const renderForm=()=>{
   if(!modal)return null;
   const mine=(p:Project)=>Boolean(form.consultant)&&(p.implementationOwner===form.consultant||data.appointments.some(a=>a.projectId===p.id&&a.consultant===form.consultant));
-  const projectOpts=[...data.projects].sort((a,b)=>Number(mine(b))-Number(mine(a))||a.name.localeCompare(b.name,"pt-BR")).map(p=>({value:p.id,label:`${p.name} · ${p.system}${mine(p)?` · carteira de ${form.consultant}`:""}`}));
+  const projectOpts=[...data.projects,...internalProjectsV39()].sort((a,b)=>Number(mine(b))-Number(mine(a))||a.name.localeCompare(b.name,"pt-BR")).map(p=>({value:p.id,label:`${p.name} · ${p.system}${mine(p)?` · carteira de ${form.consultant}`:""}`}));
   const fieldProject=<label className="form-field span2"><span className="p6-label"><Layers3 className="p6-field-icon" size={14} strokeWidth={2.1} aria-hidden="true"/>Projeto / cliente <em>*</em></span><Select value={String(form.projectId??"")} onChange={e=>setForm(f=>({...f,projectId:e.target.value}))}><option value="">Selecione um projeto</option>{projectOpts.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}</Select></label>;
   switch(modal.entity){
    case "clients":return <>{formInput("name","Nome do cliente",{required:true})}{formInput("system","Modalidade",{options:["Web SaaS","Legacy"],required:true})}{formInput("notes","Observações do cliente",{multiline:true,span:true})}{/* WMS_ESTEIRA_V21 */}<ClientSigners clientId={typeof form.id==="string"?form.id:undefined} clientName={typeof form.name==="string"?form.name:undefined} value={(form.signers as ClientSigner[]|undefined)||[]} onChange={v=>setForm(f=>({...f,signers:v}))}/></>;

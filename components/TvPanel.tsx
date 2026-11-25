@@ -5,6 +5,7 @@
 // V36 · Recarrega sozinha quando sai uma versão nova do site.
 // V37 · Cabe sempre numa tela: a visão encolhe até caber e as listas mostram só o que cabe inteiro, com "+N mais".
 // V38 · Gestão à vista em 4 telas: Pulso de hoje · Esteira por fases · Atacar primeiro · Linha do tempo da semana.
+// V39 · + Próximas implantações: homologações e go-lives por consultor e semana até o fim do ano.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarClock, CalendarX2, CheckCircle2, FileCheck2, Hand, Maximize2, Rocket, Siren, TrendingUp, Trophy, Wrench } from "lucide-react";
 import type { State } from "@/lib/types";
@@ -16,14 +17,16 @@ import { ClientLogo } from "./ClientLogo";
 import { PersonPhoto } from "./PersonPhoto";
 import { attackFirst, heatmap } from "@/lib/gargalos";
 import { tvPulse, tvRisks } from "@/lib/tv-pulse";
+import { planQueue, TBD } from "@/lib/fila";
+import { FilaBoard, FilaLegend } from "./FilaBoard";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
 import VersionWatcher from "./VersionWatcher";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
 const empty: State = { version: 1, importedAt: "", sourceFile: "", clients: [], projects: [], tasks: [], appointments: [], staff: [], users: [], audit: [] };
 const order: Record<Health, number> = { red: 0, amber: 1, green: 2, done: 3 };
-const VIEWS = ["Pulso de hoje", "Esteira por fases", "Atacar primeiro", "Linha do tempo da semana"];
-const TL = 3; // índice da linha do tempo
+const VIEWS = ["Pulso de hoje", "Esteira por fases", "Próximas implantações", "Atacar primeiro", "Linha do tempo da semana"];
+const TL = 4; // índice da linha do tempo
 const N = VIEWS.length;
 
 export default function TvPanel() {
@@ -45,6 +48,7 @@ export default function TvPanel() {
   const atk = useMemo(() => attackFirst(hm.heats, 8), [hm.heats]);
   const pulse = useMemo(() => tvPulse(data), [data]);
   const risks = useMemo(() => tvRisks(data), [data]);
+  const fila = useMemo(() => planQueue(data), [data]);
   const name = (id: string) => data.clients.find(c => c.id === id)?.name || "Cliente";
 
   return <div className="v7-tv" onDoubleClick={() => void document.documentElement.requestFullscreen?.()}>
@@ -89,7 +93,10 @@ export default function TvPanel() {
           <div key={p.id} className={`c ${h.health}`} title={h.reasons[0] || ""}><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={28} />{name(p.clientId)}</strong><small>{phaseOwner(p)} · {h.inPhase ?? 0}d{ballOf(p) !== "WMS Expert" ? ` · bola: ${ballOf(p)}` : ""}</small></div>)}
         </div>
       </div>)}
-    </section> : view === 2 ? <section className="v38-attack">
+    </section> : view === 2 ? <section className="v39-tv">
+      <div className="v39-tv-top"><FilaLegend /><span>{fila.inRange.filter(x => x.status === "agendado").length} agendados · {fila.inRange.filter(x => x.status === "pre" || x.status === "prometido").length} pré-agendados · {fila.inRange.filter(x => x.status === "sugerido").length} sugestões{fila.inRange.some(x => x.consultant === TBD) ? ` · ${fila.inRange.filter(x => x.consultant === TBD).length} sem consultor` : ""}</span></div>
+      <FilaBoard weeks={fila.weeks} consultants={fila.consultants} slots={fila.inRange} today={fila.from > todayISO() ? fila.from : todayISO()} tv maxPerCell={3} />
+    </section> : view === 3 ? <section className="v38-attack">
       <div className="panel-tv">
         <h3><Siren /> Atacar primeiro <em>{atk.length}</em></h3>
         <div className="rows">{atk.map((a, i) => <div key={a.h.p.id} className={`row ${i < 3 ? "red" : "amber"}`}>
