@@ -34,7 +34,7 @@ export async function speak(text: string, opts: { rate?: number; signal?: { canc
     if (opts.signal?.cancelled) return "ok";
     const r = await new Promise<SpeakResult | "error">(res => {
       const u = new SpeechSynthesisUtterance(part);
-      u.lang = v?.lang || "pt-BR"; if (v) u.voice = v; u.rate = opts.rate ?? 0.95; u.pitch = 1.05; u.volume = 1;
+      u.lang = v?.lang || "pt-BR"; if (v) u.voice = v; u.rate = opts.rate ?? 1.75; u.pitch = 1.05; u.volume = 1;
       let done = false; const fin = (x: SpeakResult | "error") => { if (done) return; done = true; clearTimeout(safety); clearInterval(keep); res(x); };
       // segurança: o Chrome às vezes não avisa o fim da fala
       const safety = setTimeout(() => fin("ok"), 2500 + part.length * 120);

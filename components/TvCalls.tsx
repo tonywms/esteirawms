@@ -35,7 +35,8 @@ export default function TvCalls({ items, data, voice, onDone }: { items: CallIte
           await chime();
           if (sig.cancelled) return;
           setTalking(true);
-          const r = await speak(spokenText(list.current[k]), { signal: sig });
+          const q = Number(new URLSearchParams(window.location.search).get("velocidade")); // V43.1: ?velocidade=1.5 sobrepõe nesta TV
+          const r = await speak(spokenText(list.current[k]), { signal: sig, rate: q >= 0.5 && q <= 3 ? q : 1.75 });
           setTalking(false);
           if (r === "blocked") setBlocked(true); else if (r === "ok") { spoke = true; setBlocked(false); }
         }
