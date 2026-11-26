@@ -27,6 +27,9 @@ import { PersonPhoto } from "./PersonPhoto";
 import Select from "./Select";
 import { ClientLogo } from "./ClientLogo"; // V32
 import { inFlow, isSimpleFlow } from "@/lib/flow"; // V34
+import PriorityCallBox from "./PriorityCallBox"; // V43
+import { activeCall, callQueue } from "@/lib/chamados";
+import { Siren } from "lucide-react";
 
 type Props = { data: State; onRefresh: () => Promise<void> | void; onEdit: (p: Project) => void; onOpen: (p: Project) => void };
 const clientName = (s: State, id: string) => s.clients.find(c => c.id === id)?.name || "Cliente";
@@ -117,6 +120,7 @@ function FragmentLane({ lane, rows, data, onPick }: { lane: string; rows: Return
     {PHASES.map(ph => <div key={ph.key} className={`v7-cell ${ph.key === "fim" ? "done" : ""}`}>
       {rows.filter(r => r.phase === ph.key).sort((a, b) => ({ red: 0, amber: 1, green: 2, done: 3 }[a.h.health] - { red: 0, amber: 1, green: 2, done: 3 }[b.h.health])).map(({ p, h }) =>
         <button key={p.id} className={`v7-card v7-${h.health}`} onClick={() => onPick(p.id)} title={h.reasons.join(" · ")}>
+          {(() => { const c = activeCall(p); if (!c) return null; const q = callQueue(data, todayISO()).find(x => x.p.id === p.id); return <span className={`v43-chip st-${c.status}`} title={`Entrega prioritária · ${c.owner} · ${c.reason}`}><Siren size={11} />{q ? `Fila ${q.queue}` : `Prioritária ${brShort(c.date)}`}{c.status === "atendimento" ? " · em atendimento" : ""}</span>; })()}
           {isSimpleFlow(p) && <span className="v34-flowchip" title="Fluxo simplificado: só homologação e go-live">Customização</span>}<div className="v7-card-top"><strong className="v32-nm"><ClientLogo clientId={p.clientId} size={20} />{clientName(data, p.clientId)}</strong><Dot h={h.health} /></div>
           <div className="v7-card-owner">{avatarUrl(phaseOwner(p)) ? <PersonPhoto name={phaseOwner(p)} size={22} className="v7-av-photo" /> : <span className="v7-av">{initials(phaseOwner(p))}</span>}{phaseOwner(p)}</div>
           <div className="v7-card-meta">
@@ -292,6 +296,8 @@ function ProjectDrawer({ data, p, onClose, onRefresh, onEdit, onOpen }: { data: 
           </div>
           <button className="btn primary v7-save" disabled={!!busy || !next.nextAction.trim()} onClick={() => void save("next", { ...next, nextActionDue: next.nextActionDue || null }, `Próxima ação: ${next.nextAction}${next.nextActionOwner ? ` (${next.nextActionOwner})` : ""}`)}>Salvar próxima ação</button>
         </section>
+
+        <PriorityCallBox data={data} p={p} owners={owners} onRefresh={onRefresh} notify={(m, err) => flash(m, err)} />
 
         <section className="v7-box">
           <h3><AlertTriangle size={15} /> Empecilho</h3>

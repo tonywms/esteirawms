@@ -13,7 +13,7 @@ import { avatarUrl } from "@/lib/avatars";
 
 /** V41: foto do consultor; sem foto, as iniciais num círculo colorido (o nome fica no "title"). */
 const HUES = [199, 262, 24, 168, 330, 45, 140, 215];
-function Face({ name, size }: { name: string; size: number }) {
+export function Face({ name, size }: { name: string; size: number }) {
   if (avatarUrl(name)) return <PersonPhoto name={name} size={size} />;
   const ini = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const h = HUES[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % HUES.length];

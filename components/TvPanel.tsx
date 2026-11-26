@@ -21,11 +21,15 @@ import { addDaysISO, agendaBars, panelPeople, planQueue, splitPlan, weekDays } f
 import { FilaCalendar, FilaLegend } from "./FilaBoard";
 import { buildTimeline, mondayOf, addDays, daysBetween, brS, PHASE_COLOR } from "@/lib/timeline";
 import VersionWatcher from "./VersionWatcher";
+import TvCalls from "./TvCalls"; // V43
+import { callKey, tvCalls } from "@/lib/chamados";
+import { unlockAudio } from "@/lib/tv-voice";
 
 const ROTATE_MS = 20000, REFRESH_MS = 30000;
 const empty: State = { version: 1, importedAt: "", sourceFile: "", clients: [], projects: [], tasks: [], appointments: [], staff: [], users: [], audit: [] };
 const order: Record<Health, number> = { red: 0, amber: 1, green: 2, done: 3 };
-const VIEWS = ["Pulso de hoje", "Esteira por fases", "Próximas implantações", "Atacar primeiro", "Linha do tempo da semana"];
+const VIEWS = ["Pulso de hoje", "Esteira por fases", "Próximas implantações", "Atacar primeiro", "Linha do tempo da semana", "Entregas prioritárias"];
+const CALLS = 5; // V43: chamada das entregas prioritárias (só entra quando há chamados)
 const TL = 4; // índice da linha do tempo
 const N = VIEWS.length;
 
@@ -34,7 +38,13 @@ export default function TvPanel() {
   const [view, setView] = useState(0), [now, setNow] = useState(() => new Date());
   const stage = useRef<HTMLDivElement>(null), [vp, setVp] = useState("");
   const [tlMs, setTlMs] = useState(ROTATE_MS); // V37: a linha do tempo fica o tempo de mostrar todas as páginas
-  useEffect(() => { const t = setTimeout(() => setView(v => (v + 1) % N), view === TL ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS); return () => clearTimeout(t); }, [view, tlMs]);
+  const callsRef = useRef<ReturnType<typeof tvCalls>>([]);
+  const nextView = useCallback((v: number) => { let n = (v + 1) % N; if (n === CALLS && !callsRef.current.length) n = (n + 1) % N; return n; }, []);
+  useEffect(() => {
+    (window as unknown as { __wmsTvBusy?: boolean }).__wmsTvBusy = view === CALLS; // não recarrega no meio da chamada
+    if (view === CALLS) { if (!callsRef.current.length) setView(nextView); return; } // a chamada avisa quando terminou
+    const t = setTimeout(() => setView(nextView), view === TL ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS); return () => clearTimeout(t);
+  }, [view, tlMs, nextView]);
   useEffect(() => { const r = () => setVp(`${window.innerWidth}x${window.innerHeight}`); r(); window.addEventListener("resize", r); return () => window.removeEventListener("resize", r); }, []);
   useLayoutEffect(() => { const el = stage.current; if (!el) return; fitTv(el); const t = setTimeout(() => fitTv(el), 700), t2 = setTimeout(() => fitTv(el), 2500); return () => { clearTimeout(t); clearTimeout(t2); }; }, [data, view, vp]);
   const load = useCallback(async () => {
@@ -42,7 +52,7 @@ export default function TvPanel() {
     catch (e) { setErr(e instanceof Error ? e.message : "Sem conexão"); }
   }, []);
   useEffect(() => { void load(); const a = setInterval(() => void load(), REFRESH_MS), c = setInterval(() => setNow(new Date()), 1000); return () => { clearInterval(a); clearInterval(c); }; }, [load]);
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") setView(v => (v + 1) % N); if (e.key === "f") void document.documentElement.requestFullscreen?.(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
+  useEffect(() => { const k = (e: KeyboardEvent) => { unlockAudio(); if (e.key === "ArrowRight" || e.key === "ArrowLeft") setView(v => nextView(v)); if (e.key === "f") void document.documentElement.requestFullscreen?.(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [nextView]);
   const s = useMemo(() => flowSummary(data), [data]);
   const hm = useMemo(() => heatmap(data, "fase"), [data]);
   const atk = useMemo(() => attackFirst(hm.heats, 8), [hm.heats]);
@@ -59,14 +69,26 @@ export default function TvPanel() {
     const skip = new Set(data.appointments.filter(a => placed.some(x => x.p.id === a.projectId && x.consultant === a.consultant && a.date && a.date >= x.start && a.date <= x.end)).map(a => a.id));
     return { days, placed, people, agenda: agendaBars(data, days, people, skip), queue, today };
   }, [data]);
+  // V43: entregas prioritárias. Chamado novo aparece → a TV vai para a chamada assim que puder.
+  const voice = typeof window === "undefined" || new URLSearchParams(window.location.search).get("voz") !== "0";
+  const calls = useMemo(() => tvCalls(data, todayISO()), [data]);
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    callsRef.current = calls;
+    if (!updated) return;
+    const keys = calls.map(callKey);
+    if (!seen.current) { seen.current = new Set(keys); return; }
+    const fresh = keys.some(k => !seen.current!.has(k)); keys.forEach(k => seen.current!.add(k));
+    if (fresh && view !== CALLS) setView(CALLS);
+  }, [calls, updated]); // eslint-disable-line react-hooks/exhaustive-deps
   const name = (id: string) => data.clients.find(c => c.id === id)?.name || "Cliente";
 
-  return <div className="v7-tv" onDoubleClick={() => void document.documentElement.requestFullscreen?.()}>
+  return <div className="v7-tv" onClick={() => unlockAudio()} onDoubleClick={() => void document.documentElement.requestFullscreen?.()}>
     <VersionWatcher mode="tv" />
     <header className="v7-tv-head">
       <img src="/wms-expert-logo.png" alt="WMS Expert" />
       <div className="v7-tv-title"><span>ESTEIRA DE ENTREGAS · AO VIVO</span><strong>{VIEWS[view]}</strong></div>
-      <div className="v7-tv-views">{VIEWS.map((_, i) => <i key={i} className={view === i ? "on" : ""} />)}</div>
+      <div className="v7-tv-views">{VIEWS.map((_, i) => i === CALLS && !calls.length ? null : <i key={i} className={`${view === i ? "on" : ""} ${i === CALLS ? "v43-dot" : ""}`} />)}</div>
       <div className="v7-tv-clock"><strong>{now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong><small>{now.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</small></div>
       <button className="v7-tv-full" onClick={() => void document.documentElement.requestFullscreen?.()} aria-label="Tela cheia"><Maximize2 size={18} /></button>
     </header>
@@ -130,12 +152,12 @@ export default function TvPanel() {
             {!risks.infra.length && <div className="ok"><CheckCircle2 /> Infra em dia nos próximos go-lives</div>}</div>
         </div>
       </div>
-    </section> : <TvTimeline data={data} onDuration={setTlMs} />}
+    </section> : view === CALLS ? (calls.length ? <TvCalls key={`calls-${updated ? "on" : ""}`} items={calls} data={data} voice={voice} onDone={() => setView(nextView(CALLS))} /> : <section />) : <TvTimeline data={data} onDuration={setTlMs} />}
     </div>
 
     <footer className="v7-tv-foot">
       <span className={`live ${err ? "off" : ""}`} />{err || `Atualizado ${updated ? updated.toLocaleTimeString("pt-BR") : "—"} · atualização automática a cada 30s · troca de visão a cada 20s`}
-      <span className="bar" key={view} style={{ animationDuration: `${(view === TL ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS) / 1000}s` }} />
+      {view !== CALLS && <span className="bar" key={view} style={{ animationDuration: `${(view === TL ? Math.max(ROTATE_MS, tlMs) : ROTATE_MS) / 1000}s` }} />}
     </footer>
   </div>;
 }

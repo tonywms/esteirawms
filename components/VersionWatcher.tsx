@@ -20,11 +20,12 @@ export default function VersionWatcher({ mode = "app" }: { mode?: "app" | "tv" }
       const v = await current(); if (stop || !v) return;
       if (!base.current) { base.current = v; return; }
       if (v !== base.current) {
-        if (mode === "tv" || document.visibilityState === "hidden") { setFresh(true); setTimeout(() => window.location.reload(), mode === "tv" ? 4000 : 500); }
+        if (mode === "tv" || document.visibilityState === "hidden") { setFresh(true); const go = () => { if ((window as unknown as { __wmsTvBusy?: boolean }).__wmsTvBusy) return void setTimeout(go, 3000); window.location.reload(); }; // V43: espera a chamada prioritária terminar
+          setTimeout(go, mode === "tv" ? 4000 : 500); }
         else setFresh(true);
       } else if (mode === "tv") {
         const h = new Date().getHours(); // recarga diária de segurança (TV ligada direto)
-        if (Date.now() - started.current > 20 * 3600e3 && h >= 4 && h < 6) window.location.reload();
+        if (Date.now() - started.current > 20 * 3600e3 && h >= 4 && h < 6 && !(window as unknown as { __wmsTvBusy?: boolean }).__wmsTvBusy) window.location.reload();
       }
     };
     void check();
