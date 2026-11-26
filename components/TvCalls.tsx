@@ -16,7 +16,7 @@ const SILENT_MS = 9000; // sem voz (bloqueada ou desligada), cada card fica 9s
 const hhmm = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "");
 const br = (d: string) => d.split("-").reverse().slice(0, 2).join("/");
 export function spokenText(x: CallItem) {
-  return `Atenção. Entrega prioritária. Fila ${x.queue}. Cliente: ${x.client}. Atendimento: ${x.call.owner}. ${x.call.reason.replace(/[.\s]+$/, "")}.`;
+  return `Entrega prioritária, fila ${x.queue}, cliente ${x.client}, atendimento ${x.call.owner}. ${x.call.reason.replace(/[.\s]+$/, "")}.`;
 }
 
 export default function TvCalls({ items, data, voice, onDone }: { items: CallItem[]; data: State; voice: boolean; onDone: () => void }) {
@@ -29,7 +29,7 @@ export default function TvCalls({ items, data, voice, onDone }: { items: CallIte
       for (let k = 0; k < list.current.length; k++) {
         if (sig.cancelled) return;
         setI(k);
-        await new Promise(r => setTimeout(r, 700)); // entrada do card
+        await new Promise(r => setTimeout(r, 400)); // entrada do card
         let spoke = false;
         if (voice) {
           await chime();
@@ -41,7 +41,7 @@ export default function TvCalls({ items, data, voice, onDone }: { items: CallIte
           if (r === "blocked") setBlocked(true); else if (r === "ok") { spoke = true; setBlocked(false); }
         }
         if (sig.cancelled) return;
-        await new Promise(r => setTimeout(r, spoke ? 2200 : SILENT_MS));
+        await new Promise(r => setTimeout(r, spoke ? 1200 : SILENT_MS));
       }
       if (!sig.cancelled) done.current();
     })();

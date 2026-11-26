@@ -28,7 +28,8 @@ export type SpeakResult = "ok" | "blocked" | "off";
 export async function speak(text: string, opts: { rate?: number; signal?: { cancelled: boolean } } = {}): Promise<SpeakResult> {
   if (!voiceSupported()) return "off";
   const v = await pickVoice();
-  const parts = text.split(/(?<=[.!?;:])\s+/).map(x => x.trim()).filter(Boolean);
+  // V43.2: uma fala só (cada fala nova tem ~1s de espera da voz do Google/Microsoft); só quebra textos longos
+  const parts = (text.length > 260 ? text.split(/(?<=[.!?])\s+/) : [text]).map(x => x.trim()).filter(Boolean);
   speechSynthesis.cancel();
   for (const part of parts) {
     if (opts.signal?.cancelled) return "ok";
@@ -44,7 +45,7 @@ export async function speak(text: string, opts: { rate?: number; signal?: { canc
       speechSynthesis.speak(u);
     });
     if (r === "blocked") return "blocked";
-    await new Promise(r2 => setTimeout(r2, 280)); // respiro entre as frases
+    if (parts.length > 1) await new Promise(r2 => setTimeout(r2, 120));
   }
   return "ok";
 }
@@ -64,7 +65,7 @@ export async function chime(): Promise<boolean> {
       g.gain.setValueAtTime(0.0001, t0 + d); g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 1.1);
       o.start(t0 + d); o.stop(t0 + d + 1.15);
     });
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1100));
     return true;
   } catch { return false; }
 }
